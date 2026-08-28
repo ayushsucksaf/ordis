@@ -2,8 +2,8 @@ backend/__pycache__/terminal_ws.cpython-312.pyc
 backend/__pycache__/main.cpython-312.pyc
 backend/__pycache__/agent.cpython-312.pyc
 backend/__pycache__/executor.cpython-312.pyc
-.env
+backend/.env
+secret
 backend/.env
 .venv/
-__pycache__/
 sessions/
