@@ -61,7 +61,6 @@ RUNNERS = {
 
 @app.post("/code/run")
 async def run_code(payload: dict):
-    print("\n=== /code/run ===")
 
     session_id = payload.get("session_id")
     filename = payload.get("filename")
