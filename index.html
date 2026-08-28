@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <!-- this makes it not look zoomed out weird on your phone browser -->
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>backend test page</title>
+  <style>
+    /* keeping this SUPER minimal like you asked, just enough spacing so it's
+       not an unreadable wall of inputs on a phone screen */
+    body { font-family: monospace; padding: 12px; max-width: 700px; margin: auto; }
+    section { border: 1px solid #999; padding: 10px; margin-bottom: 16px; }
+    h3 { margin-top: 0; }
+    textarea, input, select { width: 100%; box-sizing: border-box; margin: 4px 0; font-family: monospace; }
+    textarea { height: 100px; }
+    pre { background: #eee; padding: 8px; white-space: pre-wrap; word-break: break-all; min-height: 40px; }
+    button { padding: 8px; margin: 4px 0; }
+  </style>
+</head>
+<body>
+
+  <h2>backend test page (ugly on purpose lol)</h2>
+  <p>
+    this is NOT the real frontend, it's just here so you can poke every endpoint
+    and see it actually works before Atharva's real UI exists. edit API_BASE
+    below in the script if your backend isn't on localhost.
+  </p>
+
+  <!-- ============ SESSION SECTION ============ -->
+  <!-- everything else on this page needs a session_id, so this is step 1 -->
+  <section>
+    <h3>1. Session</h3>
+    <button onclick="createSession()">Create test session</button>
+    <p>current session_id: <b id="sessionIdDisplay">none yet</b></p>
+  </section>
+
+  <!-- ============ FILE EDITOR SECTION ============ -->
+  <!-- basically a fake version of what Atharva's Monaco/CodeMirror editor
+       will do later — load a file's text, edit it, save it back -->
+  <section>
+    <h3>2. File editor (fake, no real IDE here)</h3>
+    filename: <input id="filename" value="main.py" />
+    <textarea id="fileContent">print("hello from the test page")</textarea>
+    <button onclick="loadFile()">Load file</button>
+    <button onclick="saveFile()">Save file</button>
+    <p id="fileStatus"></p>
+  </section>
+
+  <!-- ============ RUN CODE SECTION ============ -->
+  <!-- this hits /code/run, which runs whatever's saved on disk right now
+       (so make sure you hit "Save file" above before you hit Run) -->
+  <section>
+    <h3>3. Run code</h3>
+    language:
+    <select id="language">
+      <option value="python3">python3</option>
+      <option value="cpp">cpp</option>
+      <option value="javascript">javascript</option>
+    </select>
+    stdin (optional):
+    <textarea id="stdin" style="height:40px"></textarea>
+    <button onclick="runCode()">▶ Run</button>
+    <p>output:</p>
+    <pre id="runOutput"></pre>
+  </section>
+
+  <!-- ============ AGENT CHAT SECTION ============ -->
+  <!-- talks to /agent/chat, which is Gemini with read/write/list file tools.
+       ask it to fix or write something and check if the file actually
+       changes (reload it in section 2 to confirm) -->
+  <section>
+    <h3>4. AI agent chat</h3>
+    <textarea id="agentMessage" style="height:60px">fix any bugs in main.py</textarea>
+    <button onclick="sendToAgent()">Send to agent</button>
+    <p>agent reply:</p>
+    <pre id="agentReply"></pre>
+  </section>
+
+  <!-- ============ TERMINAL SECTION ============ -->
+  <!-- this is a REAL bash shell running on your machine (or phone, once
+       you're in Termux) via the pty_terminal websocket. type a command,
+       hit enter or the Send button, watch the output log grow below.
+       this is NOT a real terminal UI (no colors, no cursor movement,
+       just raw text) — that's what xterm.js will do properly later -->
+  <section>
+    <h3>5. Terminal</h3>
+    <button onclick="connectTerminal()">Connect terminal</button>
+    <input id="terminalInput" placeholder="type a command, e.g. ls" onkeydown="if(event.key==='Enter') sendTerminalCommand()" />
+    <button onclick="sendTerminalCommand()">Send</button>
+    <p>terminal log:</p>
+    <pre id="terminalLog"></pre>
+  </section>
+
+  <script>
+    // ===================================================================
+    // CHANGE THIS if your backend isn't on the same machine as this page.
+    // e.g. if you're opening this page ON YOUR PHONE and the backend is
+    // running on your PC, put your PC's LAN IP here instead, like
+    // "http://192.168.1.42:8000" — and make sure you started uvicorn with
+    // --host 0.0.0.0 so it actually listens for connections from other
+    // devices, not just itself.
+    // ===================================================================
+    const API_BASE = "http://localhost:8000";
+    const WS_BASE = API_BASE.replace("http", "ws"); // same trick but for websockets
+
+    // this just holds whatever session_id we're currently working with,
+    // basically every function below reads this variable
+    let sessionId = null;
+
+    // -------------------- SESSION --------------------
+    async function createSession() {
+      const res = await fetch(`${API_BASE}/session/create`, { method: "POST" });
+      const data = await res.json();
+      sessionId = data.session_id;
+      document.getElementById("sessionIdDisplay").innerText = sessionId;
+    }
+
+    // -------------------- FILE EDITOR --------------------
+    async function loadFile() {
+      if (!sessionId) { alert("create a session first"); return; }
+      const filename = document.getElementById("filename").value;
+      const res = await fetch(`${API_BASE}/files/read?session_id=${sessionId}&path=${filename}`);
+      const data = await res.json();
+      document.getElementById("fileContent").value = data.content;
+      document.getElementById("fileStatus").innerText = "loaded " + filename;
+    }
+
+    async function saveFile() {
+      if (!sessionId) { alert("create a session first"); return; }
+      const filename = document.getElementById("filename").value;
+      const content = document.getElementById("fileContent").value;
+      await fetch(`${API_BASE}/files/write`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId, path: filename, content: content }),
+      });
+      document.getElementById("fileStatus").innerText = "saved " + filename + " ✓";
+    }
+
+    // -------------------- RUN CODE --------------------
+    async function runCode() {
+      if (!sessionId) { alert("create a session first"); return; }
+      // make sure whatever's in the textarea is actually saved before running,
+      // otherwise you'll run stale code and get confused why your edit
+      // "didn't work"
+      await saveFile();
+
+      const filename = document.getElementById("filename").value;
+      const language = document.getElementById("language").value;
+      const stdin = document.getElementById("stdin").value;
+
+      const res = await fetch(`${API_BASE}/code/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId, filename: filename, language: language, stdin: stdin }),
+      });
+      const data = await res.json();
+      // just dumping the whole response so you can see stdout/stderr/
+      // compile_output/exit_code all at once instead of guessing
+      document.getElementById("runOutput").innerText = JSON.stringify(data, null, 2);
+    }
+
+    // -------------------- AGENT CHAT --------------------
+    async function sendToAgent() {
+      if (!sessionId) { alert("create a session first"); return; }
+      const message = document.getElementById("agentMessage").value;
+
+      document.getElementById("agentReply").innerText = "thinking...";
+      const res = await fetch(`${API_BASE}/agent/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId, message: message }),
+      });
+      const data = await res.json();
+      document.getElementById("agentReply").innerText = data.reply || JSON.stringify(data);
+    }
+
+    // -------------------- TERMINAL --------------------
+    // keeping the websocket connection in a variable outside the functions
+    // so "connect" and "send" can both use the same open connection
+    let terminalSocket = null;
+
+    function connectTerminal() {
+      if (!sessionId) { alert("create a session first"); return; }
+
+      terminalSocket = new WebSocket(`${WS_BASE}/terminal?session_id=${sessionId}`);
+
+      terminalSocket.onopen = () => {
+        appendToLog("[connected to real bash shell]\n");
+      };
+
+      // every time bash outputs something, this fires and we just tack it
+      // onto the log — no fancy terminal rendering, just raw text appended
+      terminalSocket.onmessage = (event) => {
+        appendToLog(event.data);
+      };
+
+      terminalSocket.onclose = () => {
+        appendToLog("\n[terminal disconnected]\n");
+      };
+    }
+
+    function sendTerminalCommand() {
+      if (!terminalSocket || terminalSocket.readyState !== WebSocket.OPEN) {
+        alert("hit 'Connect terminal' first");
+        return;
+      }
+      const input = document.getElementById("terminalInput");
+      // real terminals send a newline when you hit enter, so we add \n
+      // ourselves here — without this bash just sits there waiting forever
+      // because it thinks you haven't pressed enter yet
+      terminalSocket.send(input.value + "\n");
+      input.value = "";
+    }
+
+    function appendToLog(text) {
+      const log = document.getElementById("terminalLog");
+      log.innerText += text;
+      // auto-scroll to the bottom so you always see the latest output
+      log.scrollTop = log.scrollHeight;
+    }
+  </script>
+
+</body>
+</html>
