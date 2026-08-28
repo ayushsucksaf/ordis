@@ -4,3 +4,6 @@ backend/__pycache__/agent.cpython-312.pyc
 backend/__pycache__/executor.cpython-312.pyc
 backend/.env
 secret
+backend/.env
+.venv/
+sessions/
