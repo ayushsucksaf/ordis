@@ -71,7 +71,9 @@
   <section>
     <h3>4. AI agent chat</h3>
     <textarea id="agentMessage" style="height:60px">fix any bugs in main.py</textarea>
+    <button onclick="useMic()">🎤 Speak instead</button>
     <button onclick="sendToAgent()">Send to agent</button>
+    <p id="micStatus"></p>
     <p>agent reply:</p>
     <pre id="agentReply"></pre>
   </section>
@@ -174,6 +176,29 @@
       const data = await res.json();
       document.getElementById("agentReply").innerText = data.reply || JSON.stringify(data);
     }
+
+        // -------------------- MIC / SPEECH-TO-TEXT --------------------
+    // this hits termux-speech-to-text on the backend. only works once
+    // you're actually running this in Termux on the phone — on your PC
+    // it'll just return the "not found" error message, that's expected
+    async function useMic() {
+      const statusEl = document.getElementById("micStatus");
+      statusEl.innerText = "listening... speak now";
+ 
+      const res = await fetch(`${API_BASE}/voice/transcribe`, { method: "POST" });
+      const data = await res.json();
+ 
+      if (data.error) {
+        statusEl.innerText = "mic error: " + data.error;
+        return;
+      }
+ 
+      // dropping it into the textarea instead of auto-sending, so you can
+      // glance at it and fix anything it misheard before hitting Send
+      document.getElementById("agentMessage").value = data.text;
+      statusEl.innerText = "heard: \"" + data.text + "\" (check it, then hit Send)";
+    }
+
 
     // -------------------- TERMINAL --------------------
     // keeping the websocket connection in a variable outside the functions
