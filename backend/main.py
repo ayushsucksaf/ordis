@@ -155,3 +155,20 @@ async def files_write(payload: dict):
     with open(full, "w") as f:
         f.write(payload["content"])
     return {"ok": True}
+
+@app.post("/voice/transcribe")
+async def voice_transcribe():
+    try:
+        result = subprocess.run(
+            ["termux-speech-to-text"],
+            capture_output=True, text=True, timeout=15,
+        )
+        # it can print partial matches as it listens, so take the last
+        # non-empty line as the actual final transcript
+        lines = [l for l in result.stdout.strip().split("\n") if l.strip()]
+        text = lines[-1] if lines else ""
+        return {"text": text}
+    except FileNotFoundError:
+        return {"error": "termux-speech-to-text not found — only works inside Termux with Termux:API installed."}
+    except subprocess.TimeoutExpired:
+        return {"error": "Listening timed out."}
