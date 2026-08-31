@@ -4,6 +4,7 @@ from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pathlib import Path
+import subprocess
 
 #--------------------------------------------------------------------
 
@@ -16,8 +17,10 @@ from .agent import make_tools
 import uuid
 import os
 from dotenv import load_dotenv
+load_dotenv(Path(__file__).resolve().parent / ".env")
 load_dotenv()
-gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+api_key = os.getenv("GEMINI_API_KEY")
+gemini_client = genai.Client(api_key=api_key) if api_key else None
 # this is for demo purposes only, we will be using a self hosted open source model in production
 
 
@@ -35,11 +38,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SESSIONS_ROOT = BASE_DIR / "sessions"
 def resolve_session_dir(session_id: str) -> Path:
     return SESSIONS_ROOT / session_id
-
-@app.get("/")
-async def serve_frontend():
-    return FileResponse(BASE_DIR / "index.html")
-
 
 RUNNERS = {
     "python3": run_python,
@@ -101,8 +99,17 @@ async def run_code(payload: dict):
     return result
 
 @app.websocket("/terminal")
-async def terminal_endpoint(websocket: WebSocket):
-    await pty_terminal(websocket, SESSIONS_ROOT)
+async def terminal_endpoint(websocket: WebSocket, session_id: str):
+    session_dir = resolve_session_dir(session_id)
+    os.makedirs(session_dir, exist_ok=True)
+    await pty_terminal(websocket, str(session_dir))
+
+@app.get("/")
+async def root_index():
+    index_file = BASE_DIR / "index.html"
+    if index_file.exists():
+        return FileResponse(index_file)
+    return {"message": "ordis backend running"}
 
 @app.get("/health")
 async def health():
@@ -110,24 +117,29 @@ async def health():
 
 @app.post("/agent/chat")
 async def agent_chat(payload: dict):
+    if not gemini_client:
+        return {"reply": "Error: GEMINI_API_KEY is not set in backend/.env"}
     session_dir = resolve_session_dir(payload.get("session_id"))
     message = payload.get("message")
 
-    response = gemini_client.models.generate_content(
-        model="gemini-3.6-flash",
-        contents=message,
-        config={
-            "tools": make_tools(session_dir),
-            "system_instruction": (
-                "You are a coding assistant embedded in a mobile IDE. "
-                "You have read_file, write_file, and list_files tools scoped "
-                "to the user's current project. When asked to fix, add, or "
-                "edit code, actually call write_file to make the change — "
-                "don't just describe it in text."
-            ),
-        },
-    )
-    return {"reply": response.text}
+    try:
+        response = gemini_client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=message,
+            config={
+                "tools": make_tools(session_dir),
+                "system_instruction": (
+                    "You are a coding assistant embedded in a mobile IDE. "
+                    "You have read_file, write_file, and list_files tools scoped "
+                    "to the user's current project. When asked to fix, add, or "
+                    "edit code, actually call write_file to make the change — "
+                    "don't just describe it in text."
+                ),
+            },
+        )
+        return {"reply": response.text}
+    except Exception as e:
+        return {"reply": f"Agent error: {str(e)}"}
 
 # TEMP: quick way to get a project folder + session_id without /git/clone
 # built yet. Just makes an empty folder and hands you the id.
@@ -136,6 +148,18 @@ async def create_session():
     session_id = str(uuid.uuid4())
     os.makedirs(os.path.join(SESSIONS_ROOT, session_id), exist_ok=True)
     return {"session_id": session_id}
+
+# flat list of every file in a session — frontend builds its own tree from this
+@app.get("/files/list")
+async def files_list(session_id: str):
+    session_dir = resolve_session_dir(session_id)
+    if not session_dir.exists():
+        return {"files": []}
+    files = []
+    for root, _, filenames in os.walk(session_dir):
+        for fn in filenames:
+            files.append(os.path.relpath(os.path.join(root, fn), session_dir))
+    return {"files": files}
 
 # TEMP: bare read/write so the test page can edit a file before running it.
 @app.get("/files/read")
