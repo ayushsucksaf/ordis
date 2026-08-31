@@ -32,7 +32,9 @@ def make_tools(session_dir: str):
     def list_files() -> list[str]:
         """List every file currently in the project."""
         out = []
-        for root, _, files in os.walk(session_dir):
+        for root, dirs, files in os.walk(session_dir):
+            if ".git" in dirs:
+                dirs.remove(".git")
             for f in files:
                 out.append(os.path.relpath(os.path.join(root, f), session_dir))
         return out

@@ -1,250 +1,765 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <!-- this makes it not look zoomed out weird on your phone browser -->
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>backend test page</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>ORDIS • Mobile IDE</title>
   <style>
-    /* keeping this SUPER minimal like you asked, just enough spacing so it's
-       not an unreadable wall of inputs on a phone screen */
-    body { font-family: monospace; padding: 12px; max-width: 700px; margin: auto; }
-    section { border: 1px solid #999; padding: 10px; margin-bottom: 16px; }
-    h3 { margin-top: 0; }
-    textarea, input, select { width: 100%; box-sizing: border-box; margin: 4px 0; font-family: monospace; }
-    textarea { height: 100px; }
-    pre { background: #eee; padding: 8px; white-space: pre-wrap; word-break: break-all; min-height: 40px; }
-    button { padding: 8px; margin: 4px 0; }
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'JetBrains Mono', Consolas, Monaco, monospace;
+      background: #0d0d0d;
+      color: #e6e6e6;
+      height: 100dvh;
+      width: 100vw;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      user-select: none;
+    }
+    button, input, select, textarea {
+      font-family: 'JetBrains Mono', Consolas, Monaco, monospace;
+      outline: none;
+    }
+    header {
+      height: 44px;
+      background: #141414;
+      border-bottom: 1px solid #262626;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 8px;
+      flex-shrink: 0;
+    }
+    .btn {
+      background: #202020;
+      color: #fff;
+      border: 1px solid #3a3a3a;
+      padding: 4px 8px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .btn:active {
+      background: #333;
+    }
+    .btn-white {
+      background: #fff;
+      color: #000;
+      border: 1px solid #fff;
+      font-weight: bold;
+    }
+    .btn-white:active {
+      background: #ccc;
+    }
+    .btn-danger {
+      background: #2a1515;
+      color: #ff8888;
+      border: 1px solid #4a2020;
+      font-weight: bold;
+    }
+    #workspace {
+      flex: 1;
+      display: flex;
+      position: relative;
+      overflow: hidden;
+    }
+    #filesDrawer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 260px;
+      background: #121212;
+      border-right: 1px solid #282828;
+      z-index: 50;
+      display: none;
+      flex-direction: column;
+      box-shadow: 4px 0 16px rgba(0,0,0,0.6);
+    }
+    #editorContainer {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #0a0a0a;
+      overflow: hidden;
+    }
+    #editorBody {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+      position: relative;
+    }
+    #lineGutter {
+      width: 36px;
+      background: #0d0d0d;
+      border-right: 1px solid #1f1f1f;
+      color: #444444;
+      fontSize: 13px;
+      line-height: 20px;
+      text-align: right;
+      padding: 8px 6px 8px 0;
+      overflow: hidden;
+    }
+    #codeEditor {
+      flex: 1;
+      background: transparent;
+      color: #f0f0f0;
+      border: none;
+      resize: none;
+      font-size: 13px;
+      line-height: 20px;
+      padding: 8px;
+      tab-size: 4;
+      white-space: pre;
+      overflow: auto;
+    }
+    #mobileKeys {
+      height: 30px;
+      background: #111;
+      border-top: 1px solid #222;
+      display: flex;
+      align-items: center;
+      overflow-x: auto;
+      padding: 0 4px;
+      gap: 2px;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+    #bottomDock {
+      height: 38dvh;
+      background: #121212;
+      border-top: 1px solid #2a2a2a;
+      display: none;
+      flex-direction: column;
+      flex-shrink: 0;
+      z-index: 40;
+    }
+    .dock-tab-btn {
+      background: transparent;
+      color: #888;
+      border: 1px solid transparent;
+      padding: 4px 8px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .dock-tab-btn.active {
+      background: #333;
+      color: #fff;
+      border-color: #555;
+    }
+    pre.output-box {
+      margin: 0;
+      background: #050505;
+      color: #e0e0e0;
+      border: 1px solid #222;
+      padding: 8px;
+      font-size: 11px;
+      line-height: 16px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
   </style>
 </head>
 <body>
 
-  <h2>backend test page (ugly on purpose lol)</h2>
-  <p>
-    this is NOT the real frontend, it's just here so you can poke every endpoint
-    and see it actually works before Atharva's real UI exists. edit API_BASE
-    below in the script if your backend isn't on localhost.
-  </p>
+  <!-- Top Bar -->
+  <header>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <button class="btn" onclick="toggleFilesDrawer()">[FILES]</button>
+      <span style="font-weight:bold; letter-spacing:1px; font-size:13px;">ORDIS</span>
+    </div>
+    <div style="font-size:12px; color:#aaa; max-width:35%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+      <span id="activeFileTitle">main.py</span><span id="dirtyIndicator" style="display:none; color:#fff;">*</span>
+    </div>
+    <div style="display:flex; align-items:center; gap:6px;">
+      <button class="btn" id="saveBtn" onclick="saveFile()">[SAVE]</button>
+      <button class="btn btn-white" id="runBtn" onclick="runCode()">[RUN]</button>
+    </div>
+  </header>
 
-  <!-- ============ SESSION SECTION ============ -->
-  <!-- everything else on this page needs a session_id, so this is step 1 -->
-  <section>
-    <h3>1. Session</h3>
-    <button onclick="createSession()">Create test session</button>
-    <p>current session_id: <b id="sessionIdDisplay">none yet</b></p>
-  </section>
+  <!-- Main Workspace -->
+  <div id="workspace">
+    <!-- Files Drawer -->
+    <div id="filesDrawer">
+      <div style="padding:8px; border-bottom:1px solid #222; display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:11px; font-weight:bold; color:#888; letter-spacing:1px;">WORKSPACE FILES</span>
+        <button class="btn" onclick="toggleFilesDrawer(false)" style="padding:2px 6px; border:none; background:transparent;">[X]</button>
+      </div>
+      <div style="padding:8px; border-bottom:1px solid #222; font-size:11px;">
+        <div style="color:#777; margin-bottom:4px;" id="drawerSessionDisplay">SESSION: none</div>
+        <div style="display:flex; gap:4px;">
+          <button class="btn" style="flex:1; font-size:11px;" onclick="createSession()">+ NEW SESSION</button>
+          <button class="btn" style="font-size:11px;" onclick="refreshFiles()">REFRESH</button>
+        </div>
+      </div>
+      <div style="padding:8px; border-bottom:1px solid #222; display:flex; gap:4px;">
+        <input id="newFileInput" placeholder="new_file.py" style="flex:1; background:#080808; color:#fff; border:1px solid #333; padding:4px 6px; font-size:11px;" onkeydown="if(event.key==='Enter') createNewFile()" />
+        <button class="btn" onclick="createNewFile()">+</button>
+      </div>
+      <div id="fileListContainer" style="flex:1; overflow-y:auto; padding:4px 0;"></div>
+    </div>
 
-  <!-- ============ FILE EDITOR SECTION ============ -->
-  <!-- basically a fake version of what Atharva's Monaco/CodeMirror editor
-       will do later — load a file's text, edit it, save it back -->
-  <section>
-    <h3>2. File editor (fake, no real IDE here)</h3>
-    filename: <input id="filename" value="main.py" />
-    <textarea id="fileContent">print("hello from the test page")</textarea>
-    <button onclick="loadFile()">Load file</button>
-    <button onclick="saveFile()">Save file</button>
-    <p id="fileStatus"></p>
-  </section>
+    <!-- Code Editor Container -->
+    <div id="editorContainer">
+      <div id="editorBody">
+        <div id="lineGutter">1</div>
+        <textarea id="codeEditor" spellcheck="false"># ordis mobile ide
+print("hello world")
+</textarea>
+      </div>
 
-  <!-- ============ RUN CODE SECTION ============ -->
-  <!-- this hits /code/run, which runs whatever's saved on disk right now
-       (so make sure you hit "Save file" above before you hit Run) -->
-  <section>
-    <h3>3. Run code</h3>
-    language:
-    <select id="language">
-      <option value="python3">python3</option>
-      <option value="cpp">cpp</option>
-      <option value="javascript">javascript</option>
-    </select>
-    stdin (optional):
-    <textarea id="stdin" style="height:40px"></textarea>
-    <button onclick="runCode()">▶ Run</button>
-    <p>output:</p>
-    <pre id="runOutput"></pre>
-  </section>
+      <!-- Mobile helper keyboard bar -->
+      <div id="mobileKeys"></div>
+    </div>
+  </div>
 
-  <!-- ============ AGENT CHAT SECTION ============ -->
-  <!-- talks to /agent/chat, which is Gemini with read/write/list file tools.
-       ask it to fix or write something and check if the file actually
-       changes (reload it in section 2 to confirm) -->
-  <section>
-    <h3>4. AI agent chat</h3>
-    <textarea id="agentMessage" style="height:60px">fix any bugs in main.py</textarea>
-    <button onclick="useMic()">🎤 Speak instead</button>
-    <button onclick="sendToAgent()">Send to agent</button>
-    <p id="micStatus"></p>
-    <p>agent reply:</p>
-    <pre id="agentReply"></pre>
-  </section>
+  <!-- Bottom Dock Panel -->
+  <div id="bottomDock">
+    <div style="height:30px; background:#171717; border-bottom:1px solid #222; display:flex; align-items:center; justify-content:space-between; padding:0 8px; font-size:11px;">
+      <span id="dockTitle" style="font-weight:bold; color:#888;">OUTPUT</span>
+      <div style="display:flex; gap:6px;">
+        <button class="btn" style="padding:2px 4px; background:transparent; border:none;" onclick="toggleDockSize()">[EXPAND]</button>
+        <button class="btn" style="padding:2px 4px; background:transparent; border:none;" onclick="setBottomTab('none')">[HIDE]</button>
+      </div>
+    </div>
 
-  <!-- ============ TERMINAL SECTION ============ -->
-  <!-- this is a REAL bash shell running on your machine (or phone, once
-       you're in Termux) via the pty_terminal websocket. type a command,
-       hit enter or the Send button, watch the output log grow below.
-       this is NOT a real terminal UI (no colors, no cursor movement,
-       just raw text) — that's what xterm.js will do properly later -->
-  <section>
-    <h3>5. Terminal</h3>
-    <button onclick="connectTerminal()">Connect terminal</button>
-    <input id="terminalInput" placeholder="type a command, e.g. ls" onkeydown="if(event.key==='Enter') sendTerminalCommand()" />
-    <button onclick="sendTerminalCommand()">Send</button>
-    <p>terminal log:</p>
-    <pre id="terminalLog"></pre>
-  </section>
+    <!-- Output Tab -->
+    <div id="panelOutput" style="flex:1; display:flex; flex-direction:column; padding:8px; overflow:hidden;">
+      <div style="display:flex; gap:6px; margin-bottom:6px; align-items:center; flex-wrap:wrap;">
+        <span style="font-size:11px; color:#888;">LANG:</span>
+        <select id="language" style="background:#080808; color:#fff; border:1px solid #333; padding:3px 6px; font-size:11px;">
+          <option value="python3">python3</option>
+          <option value="cpp">cpp (clang++)</option>
+          <option value="javascript">javascript (node)</option>
+        </select>
+        <input id="stdin" placeholder="stdin (optional)..." style="flex:1; min-width:100px; background:#080808; color:#fff; border:1px solid #333; padding:3px 6px; font-size:11px;" />
+        <button class="btn btn-white" onclick="runCode()">RUN</button>
+      </div>
+      <pre id="runOutput" class="output-box" style="flex:1;">(Click [RUN] to execute code)</pre>
+    </div>
+
+    <!-- Terminal Tab -->
+    <div id="panelTerminal" style="flex:1; display:none; flex-direction:column; padding:8px; overflow:hidden;">
+      <div style="display:flex; gap:4px; margin-bottom:6px; overflow-x:auto; white-space:nowrap;">
+        <button class="btn" id="termToggleBtn" onclick="toggleTerminal()">[CONNECT]</button>
+        <button class="btn" onclick="sendQuickCommand('ls -la')">ls -la</button>
+        <button class="btn" onclick="sendQuickCommand('pwd')">pwd</button>
+        <button class="btn" onclick="sendQuickCommand('git status')">git status</button>
+        <button class="btn" onclick="sendQuickCommand('python3 ' + activeFile)">python3 file</button>
+        <button class="btn" onclick="sendQuickCommand('clear')">clear</button>
+        <button class="btn btn-danger" onclick="sendCtrlC()">Ctrl+C</button>
+      </div>
+      <pre id="terminalLog" class="output-box" style="flex:1; background:#000; color:#d0d0d0; margin-bottom:6px;">[terminal ready - click connect or type command below]
+</pre>
+      <div style="display:flex; gap:4px;">
+        <input id="terminalInput" placeholder="type bash command..." style="flex:1; background:#080808; color:#fff; border:1px solid #333; padding:4px 8px; font-size:12px;" onkeydown="if(event.key==='Enter') sendTerminalCommand()" />
+        <button class="btn btn-white" onclick="sendTerminalCommand()">SEND</button>
+      </div>
+    </div>
+
+    <!-- AI Tab -->
+    <div id="panelAI" style="flex:1; display:none; flex-direction:column; padding:8px; overflow:hidden;">
+      <div style="display:flex; gap:4px; margin-bottom:6px; overflow-x:auto; white-space:nowrap;">
+        <button class="btn" style="font-size:10px;" onclick="setAgentPrompt('fix bugs in ' + activeFile)">fix bugs</button>
+        <button class="btn" style="font-size:10px;" onclick="setAgentPrompt('add comments to ' + activeFile)">add comments</button>
+        <button class="btn" style="font-size:10px;" onclick="setAgentPrompt('write unit test for ' + activeFile)">write tests</button>
+      </div>
+      <div style="display:flex; gap:4px; margin-bottom:6px;">
+        <input id="agentPrompt" placeholder="Ask agent to write or edit code..." value="fix any bugs in main.py" style="flex:1; background:#080808; color:#fff; border:1px solid #333; padding:4px 8px; font-size:12px;" onkeydown="if(event.key==='Enter') sendToAgent()" />
+        <button class="btn" onclick="useMic()">MIC</button>
+        <button class="btn btn-white" id="agentSendBtn" onclick="sendToAgent()">ASK</button>
+      </div>
+      <div id="voiceStatus" style="font-size:10px; color:#888; margin-bottom:4px;"></div>
+      <pre id="agentReply" class="output-box" style="flex:1;">(Agent responses and file edit summaries will appear here)</pre>
+    </div>
+
+    <!-- Git Tab -->
+    <div id="panelGit" style="flex:1; display:none; flex-direction:column; padding:8px; overflow:hidden;">
+      <div style="display:flex; gap:4px; margin-bottom:6px; overflow-x:auto; white-space:nowrap;">
+        <button class="btn" onclick="runGitCmd('git status')">STATUS</button>
+        <button class="btn" onclick="runGitCmd('git diff')">DIFF</button>
+        <button class="btn" onclick="runGitCmd('git log --oneline -n 5')">LOG</button>
+        <button class="btn" onclick="runGitCmd('git pull')">PULL</button>
+        <button class="btn" onclick="runGitCmd('git push')">PUSH</button>
+        <button class="btn" onclick="runGitCmd('git fetch')">FETCH</button>
+        <button class="btn" onclick="runGitCmd('git branch -a')">BRANCHES</button>
+        <button class="btn" onclick="runGitCmd('git stash')">STASH</button>
+        <button class="btn" onclick="runGitCmd('git stash pop')">POP</button>
+      </div>
+      <div style="display:flex; gap:4px; margin-bottom:6px;">
+        <button class="btn" style="white-space:nowrap;" onclick="runGitCmd('git add .')">STAGE ALL</button>
+        <input id="gitCommitInput" placeholder="commit message..." style="flex:1; background:#080808; color:#fff; border:1px solid #333; padding:3px 6px; font-size:11px;" onkeydown="if(event.key==='Enter') commitGit()" />
+        <button class="btn btn-white" onclick="commitGit()">COMMIT</button>
+      </div>
+      <div style="display:flex; gap:4px; margin-bottom:6px;">
+        <input id="gitBranchInput" placeholder="new branch name..." style="flex:1; background:#080808; color:#fff; border:1px solid #333; padding:3px 6px; font-size:11px;" onkeydown="if(event.key==='Enter') branchGit()" />
+        <button class="btn" onclick="branchGit()">+ BRANCH</button>
+      </div>
+      <pre id="gitLog" class="output-box" style="flex:1; margin-bottom:6px;">[git panel ready - use buttons above to manage repository]
+</pre>
+      <!-- Quick helper actions for git terminal -->
+      <div style="display:flex; gap:4px; margin-bottom:4px;">
+        <button class="btn" style="font-weight:bold;" onclick="runGitCmd('')">[ENTER]</button>
+        <button class="btn" onclick="runGitCmd('q')">[q (QUIT PAGER)]</button>
+        <button class="btn btn-danger" onclick="sendCtrlC()">Ctrl+C</button>
+        <button class="btn" style="margin-left:auto; color:#888;" onclick="clearGitLog()">CLEAR</button>
+      </div>
+      <!-- Interactive Git Command / Response Input -->
+      <div style="display:flex; gap:4px;">
+        <input id="gitTerminalInput" placeholder="type git command, branch, or response (e.g. y, n, q)..." style="flex:1; background:#080808; color:#fff; border:1px solid #333; padding:4px 8px; font-size:11px;" onkeydown="if(event.key==='Enter') sendGitTerminalInput()" />
+        <button class="btn btn-white" onclick="sendGitTerminalInput()">SEND</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Dock Bar -->
+  <footer style="height:36px; background:#141414; border-top:1px solid #262626; display:flex; align-items:center; justify-content:space-between; padding:0 6px; flex-shrink:0;">
+    <div style="display:flex; gap:4px;">
+      <button id="tabBtnOutput" class="dock-tab-btn" onclick="toggleBottomTab('output')">[OUTPUT]</button>
+      <button id="tabBtnTerminal" class="dock-tab-btn" onclick="toggleBottomTab('terminal')">[TERMINAL]</button>
+      <button id="tabBtnAI" class="dock-tab-btn" onclick="toggleBottomTab('ai')">[AI AGENT]</button>
+      <button id="tabBtnGit" class="dock-tab-btn" onclick="toggleBottomTab('git')">[GIT]</button>
+    </div>
+    <div id="footerStatus" style="font-size:10px; color:#666;">READY</div>
+  </footer>
 
   <script>
-    // ===================================================================
-    // CHANGE THIS if your backend isn't on the same machine as this page.
-    // e.g. if you're opening this page ON YOUR PHONE and the backend is
-    // running on your PC, put your PC's LAN IP here instead, like
-    // "http://192.168.1.42:8000" — and make sure you started uvicorn with
-    // --host 0.0.0.0 so it actually listens for connections from other
-    // devices, not just itself.
-    // ===================================================================
-    const API_BASE = "http://localhost:8000";
-    const WS_BASE = API_BASE.replace("http", "ws"); // same trick but for websockets
+    const host = window.location.hostname || "localhost";
+    const protocol = window.location.protocol.startsWith("http") ? window.location.protocol : "http:";
+    const API_BASE = `${protocol}//${host}:8000`;
+    const WS_BASE = API_BASE.replace(/^http/, "ws");
 
-    // this just holds whatever session_id we're currently working with,
-    // basically every function below reads this variable
     let sessionId = null;
+    let activeFile = "main.py";
+    let savedContent = "";
+    let terminalSocket = null;
+    let currentBottomTab = "none";
+    let isLargeDock = false;
 
-    // -------------------- SESSION --------------------
-    async function createSession() {
-      const res = await fetch(`${API_BASE}/session/create`, { method: "POST" });
-      const data = await res.json();
-      sessionId = data.session_id;
-      document.getElementById("sessionIdDisplay").innerText = sessionId;
+    function cleanAnsi(text) {
+      return text
+        .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "")
+        .replace(/\x1b\].*?(\x07|\x1b\\)/g, "")
+        .replace(/\x1b[PX^_].*?\x1b\\/g, "")
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1A\x1C-\x1F]/g, "");
     }
 
-    // -------------------- FILE EDITOR --------------------
-    async function loadFile() {
-      if (!sessionId) { alert("create a session first"); return; }
-      const filename = document.getElementById("filename").value;
-      const res = await fetch(`${API_BASE}/files/read?session_id=${sessionId}&path=${filename}`);
-      const data = await res.json();
-      document.getElementById("fileContent").value = data.content;
-      document.getElementById("fileStatus").innerText = "loaded " + filename;
+    function updateLineNumbers() {
+      const code = document.getElementById("codeEditor").value;
+      const count = Math.max(code.split("\n").length, 1);
+      let linesHtml = "";
+      for (let i = 1; i <= count; i++) {
+        linesHtml += `<div style="height:20px;">${i}</div>`;
+      }
+      document.getElementById("lineGutter").innerHTML = linesHtml;
+
+      const isDirty = code !== savedContent;
+      document.getElementById("dirtyIndicator").style.display = isDirty ? "inline" : "none";
+      document.getElementById("saveBtn").className = isDirty ? "btn btn-white" : "btn";
+    }
+
+    function toggleFilesDrawer(force) {
+      const drawer = document.getElementById("filesDrawer");
+      const isVisible = drawer.style.display === "flex";
+      const next = force !== undefined ? force : !isVisible;
+      drawer.style.display = next ? "flex" : "none";
+    }
+
+    function setBottomTab(tab) {
+      currentBottomTab = tab;
+      const dock = document.getElementById("bottomDock");
+      const pOut = document.getElementById("panelOutput");
+      const pTerm = document.getElementById("panelTerminal");
+      const pAI = document.getElementById("panelAI");
+      const pGit = document.getElementById("panelGit");
+      const tOut = document.getElementById("tabBtnOutput");
+      const tTerm = document.getElementById("tabBtnTerminal");
+      const tAI = document.getElementById("tabBtnAI");
+      const tGit = document.getElementById("tabBtnGit");
+
+      [tOut, tTerm, tAI, tGit].forEach(b => b.classList.remove("active"));
+      [pOut, pTerm, pAI, pGit].forEach(p => p.style.display = "none");
+
+      if (tab === "none") {
+        dock.style.display = "none";
+        return;
+      }
+
+      dock.style.display = "flex";
+      if (tab === "output") {
+        pOut.style.display = "flex";
+        tOut.classList.add("active");
+        document.getElementById("dockTitle").innerText = "CODE EXECUTION OUTPUT";
+      } else if (tab === "terminal") {
+        pTerm.style.display = "flex";
+        tTerm.classList.add("active");
+        document.getElementById("dockTitle").innerText = "BASH SHELL (PTY)";
+        if (!terminalSocket || terminalSocket.readyState !== WebSocket.OPEN) {
+          toggleTerminal();
+        }
+      } else if (tab === "ai") {
+        pAI.style.display = "flex";
+        tAI.classList.add("active");
+        document.getElementById("dockTitle").innerText = "AI AGENT ASSISTANT";
+      } else if (tab === "git") {
+        pGit.style.display = "flex";
+        tGit.classList.add("active");
+        document.getElementById("dockTitle").innerText = "GIT OPERATIONS & REPO SYNC";
+        if (!terminalSocket || terminalSocket.readyState !== WebSocket.OPEN) {
+          toggleTerminal();
+        }
+      }
+    }
+
+    function toggleBottomTab(tab) {
+      if (currentBottomTab === tab) {
+        setBottomTab("none");
+      } else {
+        setBottomTab(tab);
+      }
+    }
+
+    function toggleDockSize() {
+      isLargeDock = !isLargeDock;
+      document.getElementById("bottomDock").style.height = isLargeDock ? "65dvh" : "38dvh";
+    }
+
+    function setStatus(msg) {
+      document.getElementById("footerStatus").innerText = msg;
+    }
+
+    function detectLanguage(fn) {
+      const ext = fn.split(".").pop().toLowerCase();
+      if (ext === "py") return "python3";
+      if (ext === "cpp" || ext === "cc" || ext === "cxx" || ext === "c") return "cpp";
+      if (ext === "js" || ext === "ts" || ext === "mjs") return "javascript";
+      return "python3";
+    }
+
+    // Init session
+    async function createSession() {
+      try {
+        if (terminalSocket) terminalSocket.close();
+        const res = await fetch(`${API_BASE}/session/create`, { method: "POST" });
+        const data = await res.json();
+        sessionId = data.session_id;
+        document.getElementById("drawerSessionDisplay").innerText = "SESSION: " + sessionId.slice(0, 8);
+
+        const initial = '# ordis mobile ide\nprint("hello world")\n';
+        await fetch(`${API_BASE}/files/write`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: sessionId, path: "main.py", content: initial }),
+        });
+
+        activeFile = "main.py";
+        document.getElementById("activeFileTitle").innerText = "main.py";
+        document.getElementById("codeEditor").value = initial;
+        savedContent = initial;
+        updateLineNumbers();
+        await refreshFiles();
+        setStatus("Session ready");
+        toggleFilesDrawer(false);
+      } catch (err) {
+        setStatus("Error: " + err.message);
+      }
+    }
+
+    async function refreshFiles() {
+      if (!sessionId) return;
+      try {
+        const res = await fetch(`${API_BASE}/files/list?session_id=${sessionId}`);
+        const data = await res.json();
+        const list = data.files && data.files.length ? data.files : ["main.py"];
+        const container = document.getElementById("fileListContainer");
+        container.innerHTML = "";
+        list.forEach(f => {
+          const item = document.createElement("div");
+          const isSelected = f === activeFile;
+          item.style.padding = "6px 12px";
+          item.style.fontSize = "12px";
+          item.style.cursor = "pointer";
+          item.style.background = isSelected ? "#242424" : "transparent";
+          item.style.color = isSelected ? "#ffffff" : "#aaaaaa";
+          item.style.borderLeft = isSelected ? "2px solid #ffffff" : "2px solid transparent";
+          item.innerText = f;
+          item.onclick = () => loadFile(f);
+          container.appendChild(item);
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function loadFile(f) {
+      if (!sessionId) return;
+      setStatus("Loading " + f + "...");
+      try {
+        const res = await fetch(`${API_BASE}/files/read?session_id=${sessionId}&path=${encodeURIComponent(f)}`);
+        const data = await res.json();
+        activeFile = f;
+        document.getElementById("activeFileTitle").innerText = f;
+        document.getElementById("codeEditor").value = data.content ?? "";
+        savedContent = data.content ?? "";
+        document.getElementById("language").value = detectLanguage(f);
+        updateLineNumbers();
+        setStatus("Loaded " + f);
+        toggleFilesDrawer(false);
+        refreshFiles();
+      } catch (e) {
+        setStatus("Error: " + e.message);
+      }
     }
 
     async function saveFile() {
-      if (!sessionId) { alert("create a session first"); return; }
-      const filename = document.getElementById("filename").value;
-      const content = document.getElementById("fileContent").value;
+      if (!sessionId) return;
+      const content = document.getElementById("codeEditor").value;
+      setStatus("Saving " + activeFile + "...");
+      try {
+        await fetch(`${API_BASE}/files/write`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: sessionId, path: activeFile, content: content }),
+        });
+        savedContent = content;
+        updateLineNumbers();
+        setStatus("Saved " + activeFile);
+        refreshFiles();
+      } catch (e) {
+        setStatus("Error saving: " + e.message);
+      }
+    }
+
+    async function createNewFile() {
+      if (!sessionId) return;
+      const input = document.getElementById("newFileInput");
+      const name = input.value.trim();
+      if (!name) return;
+      const initial = name.endsWith(".cpp") ? '#include <iostream>\nint main(){ std::cout << "Hello" << std::endl; }\n' : '# Python\nprint("Hello")\n';
       await fetch(`${API_BASE}/files/write`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId, path: filename, content: content }),
+        body: JSON.stringify({ session_id: sessionId, path: name, content: initial }),
       });
-      document.getElementById("fileStatus").innerText = "saved " + filename + " ✓";
+      input.value = "";
+      await refreshFiles();
+      await loadFile(name);
     }
 
-    // -------------------- RUN CODE --------------------
     async function runCode() {
-      if (!sessionId) { alert("create a session first"); return; }
-      // make sure whatever's in the textarea is actually saved before running,
-      // otherwise you'll run stale code and get confused why your edit
-      // "didn't work"
+      if (!sessionId) return;
       await saveFile();
-
-      const filename = document.getElementById("filename").value;
-      const language = document.getElementById("language").value;
+      setBottomTab("output");
+      const lang = document.getElementById("language").value;
       const stdin = document.getElementById("stdin").value;
-
-      const res = await fetch(`${API_BASE}/code/run`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId, filename: filename, language: language, stdin: stdin }),
-      });
-      const data = await res.json();
-      // just dumping the whole response so you can see stdout/stderr/
-      // compile_output/exit_code all at once instead of guessing
-      document.getElementById("runOutput").innerText = JSON.stringify(data, null, 2);
+      const out = document.getElementById("runOutput");
+      out.innerText = `Running ${activeFile} (${lang})...`;
+      setStatus(`Running ${activeFile}...`);
+      try {
+        const res = await fetch(`${API_BASE}/code/run`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: sessionId, filename: activeFile, language: lang, stdin: stdin }),
+        });
+        const data = await res.json();
+        out.innerText = JSON.stringify(data, null, 2);
+        setStatus("Execution finished");
+      } catch (e) {
+        out.innerText = "Error: " + e.message;
+        setStatus("Execution error");
+      }
     }
 
-    // -------------------- AGENT CHAT --------------------
+    function setAgentPrompt(p) {
+      document.getElementById("agentPrompt").value = p;
+    }
+
     async function sendToAgent() {
-      if (!sessionId) { alert("create a session first"); return; }
-      const message = document.getElementById("agentMessage").value;
-
-      document.getElementById("agentReply").innerText = "thinking...";
-      const res = await fetch(`${API_BASE}/agent/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId, message: message }),
-      });
-      const data = await res.json();
-      document.getElementById("agentReply").innerText = data.reply || JSON.stringify(data);
+      if (!sessionId) return;
+      const prompt = document.getElementById("agentPrompt").value.trim();
+      if (!prompt) return;
+      setBottomTab("ai");
+      const replyEl = document.getElementById("agentReply");
+      replyEl.innerText = "Agent is processing and modifying files...";
+      setStatus("Agent thinking...");
+      try {
+        const res = await fetch(`${API_BASE}/agent/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: sessionId, message: prompt }),
+        });
+        const data = await res.json();
+        replyEl.innerText = data.reply || data.error || "Done";
+        await refreshFiles();
+        await loadFile(activeFile);
+        setStatus("Agent finished");
+      } catch (e) {
+        replyEl.innerText = "Agent error: " + e.message;
+        setStatus("Agent error");
+      }
     }
 
-        // -------------------- MIC / SPEECH-TO-TEXT --------------------
-    // this hits termux-speech-to-text on the backend. only works once
-    // you're actually running this in Termux on the phone — on your PC
-    // it'll just return the "not found" error message, that's expected
     async function useMic() {
-      const statusEl = document.getElementById("micStatus");
-      statusEl.innerText = "listening... speak now";
- 
-      const res = await fetch(`${API_BASE}/voice/transcribe`, { method: "POST" });
-      const data = await res.json();
- 
-      if (data.error) {
-        statusEl.innerText = "mic error: " + data.error;
+      const el = document.getElementById("voiceStatus");
+      el.innerText = "Listening via Termux microphone...";
+      try {
+        const res = await fetch(`${API_BASE}/voice/transcribe`, { method: "POST" });
+        const data = await res.json();
+        if (data.error) {
+          el.innerText = data.error;
+        } else if (data.text) {
+          document.getElementById("agentPrompt").value = data.text;
+          el.innerText = `Recognized: "${data.text}"`;
+        }
+      } catch (e) {
+        el.innerText = "Mic error: " + e.message;
+      }
+    }
+
+    function toggleTerminal() {
+      if (!sessionId) return;
+      const btn = document.getElementById("termToggleBtn");
+      const log = document.getElementById("terminalLog");
+
+      if (terminalSocket && terminalSocket.readyState === WebSocket.OPEN) {
+        terminalSocket.close();
+        btn.innerText = "[CONNECT]";
         return;
       }
- 
-      // dropping it into the textarea instead of auto-sending, so you can
-      // glance at it and fix anything it misheard before hitting Send
-      document.getElementById("agentMessage").value = data.text;
-      statusEl.innerText = "heard: \"" + data.text + "\" (check it, then hit Send)";
-    }
 
-
-    // -------------------- TERMINAL --------------------
-    // keeping the websocket connection in a variable outside the functions
-    // so "connect" and "send" can both use the same open connection
-    let terminalSocket = null;
-
-    function connectTerminal() {
-      if (!sessionId) { alert("create a session first"); return; }
-
+      log.innerText += `[connecting to bash...]\n`;
       terminalSocket = new WebSocket(`${WS_BASE}/terminal?session_id=${sessionId}`);
 
       terminalSocket.onopen = () => {
-        appendToLog("[connected to real bash shell]\n");
+        btn.innerText = "[DISCONNECT]";
+        log.innerText += `[connected to bash]\n`;
       };
 
-      // every time bash outputs something, this fires and we just tack it
-      // onto the log — no fancy terminal rendering, just raw text appended
-      terminalSocket.onmessage = (event) => {
-        appendToLog(event.data);
+      terminalSocket.onmessage = (e) => {
+        const text = cleanAnsi(e.data);
+        log.innerText += text;
+        log.scrollTop = log.scrollHeight;
+
+        const gitLog = document.getElementById("gitLog");
+        if (gitLog) {
+          gitLog.innerText += text;
+          gitLog.scrollTop = gitLog.scrollHeight;
+        }
       };
 
       terminalSocket.onclose = () => {
-        appendToLog("\n[terminal disconnected]\n");
+        btn.innerText = "[CONNECT]";
+        log.innerText += `\n[terminal disconnected]\n`;
       };
     }
 
     function sendTerminalCommand() {
       if (!terminalSocket || terminalSocket.readyState !== WebSocket.OPEN) {
-        alert("hit 'Connect terminal' first");
+        toggleTerminal();
         return;
       }
-      const input = document.getElementById("terminalInput");
-      // real terminals send a newline when you hit enter, so we add \n
-      // ourselves here — without this bash just sits there waiting forever
-      // because it thinks you haven't pressed enter yet
-      terminalSocket.send(input.value + "\n");
-      input.value = "";
+      const inp = document.getElementById("terminalInput");
+      terminalSocket.send(inp.value + "\n");
+      inp.value = "";
     }
 
-    function appendToLog(text) {
-      const log = document.getElementById("terminalLog");
-      log.innerText += text;
-      // auto-scroll to the bottom so you always see the latest output
-      log.scrollTop = log.scrollHeight;
+    function sendQuickCommand(cmd) {
+      if (!terminalSocket || terminalSocket.readyState !== WebSocket.OPEN) {
+        toggleTerminal();
+        setTimeout(() => {
+          if (terminalSocket) terminalSocket.send(cmd + "\n");
+        }, 300);
+        return;
+      }
+      terminalSocket.send(cmd + "\n");
     }
+
+    function sendCtrlC() {
+      if (terminalSocket && terminalSocket.readyState === WebSocket.OPEN) {
+        terminalSocket.send("\x03");
+      }
+    }
+
+    // Git operations handler
+    function runGitCmd(cmd) {
+      const gLog = document.getElementById("gitLog");
+      gLog.innerText += `\n$ ${cmd}\n`;
+      sendQuickCommand(cmd);
+    }
+
+    function commitGit() {
+      const inp = document.getElementById("gitCommitInput");
+      const msg = inp.value.trim();
+      if (!msg) return;
+      runGitCmd(`git commit -m "${msg.replace(/"/g, '\\"')}"`);
+      inp.value = "";
+    }
+
+    function branchGit() {
+      const inp = document.getElementById("gitBranchInput");
+      const name = inp.value.trim();
+      if (!name) return;
+      runGitCmd(`git checkout -b ${name}`);
+      inp.value = "";
+    }
+
+    function sendGitTerminalInput() {
+      const inp = document.getElementById("gitTerminalInput");
+      const cmd = inp.value;
+      const gLog = document.getElementById("gitLog");
+      gLog.innerText += `\n> ${cmd}\n`;
+      sendQuickCommand(cmd);
+      inp.value = "";
+    }
+
+    function clearGitLog() {
+      const gLog = document.getElementById("gitLog");
+      if (gLog) gLog.innerText = "[git log cleared]\n";
+    }
+
+    // Keyboard keys helper
+    function insertKey(k) {
+      const editor = document.getElementById("codeEditor");
+      const start = editor.selectionStart;
+      const end = editor.selectionEnd;
+      const val = editor.value;
+      editor.value = val.substring(0, start) + k + val.substring(end);
+      editor.selectionStart = editor.selectionEnd = start + k.length;
+      editor.focus();
+      updateLineNumbers();
+    }
+
+    // Init mobile keyboard keys
+    const keys = ["Tab", "{", "}", "(", ")", "[", "]", ";", ":", '"', "'", "=", "+", "-", "_", ".", "/", "\\"];
+    const keyContainer = document.getElementById("mobileKeys");
+    keys.forEach(k => {
+      const b = document.createElement("button");
+      b.className = "btn";
+      b.style.padding = "2px 8px";
+      b.style.fontSize = "11px";
+      b.style.minWidth = "24px";
+      b.innerText = k;
+      b.onclick = () => insertKey(k === "Tab" ? "    " : k);
+      keyContainer.appendChild(b);
+    });
+
+    document.getElementById("codeEditor").addEventListener("input", updateLineNumbers);
+    document.getElementById("codeEditor").addEventListener("keydown", function(e) {
+      if (e.key === "Tab") {
+        e.preventDefault();
+        insertKey("    ");
+      }
+    });
+
+    window.addEventListener("DOMContentLoaded", () => {
+      createSession();
+    });
   </script>
-
 </body>
 </html>
