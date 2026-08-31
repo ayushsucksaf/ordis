@@ -141,22 +141,42 @@ async def agent_chat(payload: dict):
     except Exception as e:
         return {"reply": f"Agent error: {str(e)}"}
 
-# TEMP: quick way to get a project folder + session_id without /git/clone
-# built yet. Just makes an empty folder and hands you the id.
+# Quick way to get a project folder + session_id with standalone git repo.
 @app.post("/session/create")
 async def create_session():
     session_id = str(uuid.uuid4())
-    os.makedirs(os.path.join(SESSIONS_ROOT, session_id), exist_ok=True)
+    session_dir = os.path.join(SESSIONS_ROOT, session_id)
+    os.makedirs(session_dir, exist_ok=True)
+    
+    # Initialize a standalone git repository for this workspace
+    try:
+        subprocess.run(["git", "init", "-b", "main"], cwd=session_dir, capture_output=True)
+    except Exception:
+        subprocess.run(["git", "init"], cwd=session_dir, capture_output=True)
+    
+    subprocess.run(["git", "config", "user.name", "Ordis User"], cwd=session_dir, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "user@ordis.local"], cwd=session_dir, capture_output=True)
+    
+    # Create initial file and initial commit
+    main_file = os.path.join(session_dir, "main.py")
+    if not os.path.exists(main_file):
+        with open(main_file, "w") as f:
+            f.write('# ordis mobile ide\nprint("hello world")\n')
+        subprocess.run(["git", "add", "main.py"], cwd=session_dir, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "initial commit"], cwd=session_dir, capture_output=True)
+        
     return {"session_id": session_id}
 
-# flat list of every file in a session — frontend builds its own tree from this
+# flat list of every file in a session — ignores .git folder
 @app.get("/files/list")
 async def files_list(session_id: str):
     session_dir = resolve_session_dir(session_id)
     if not session_dir.exists():
         return {"files": []}
     files = []
-    for root, _, filenames in os.walk(session_dir):
+    for root, dirs, filenames in os.walk(session_dir):
+        if ".git" in dirs:
+            dirs.remove(".git")
         for fn in filenames:
             files.append(os.path.relpath(os.path.join(root, fn), session_dir))
     return {"files": files}

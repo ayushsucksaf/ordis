@@ -1,0 +1,417 @@
+[1mdiff --git a/frontend/app/page.tsx b/frontend/app/page.tsx[m
+[1mindex 56f15d6..4e64681 100644[m
+[1m--- a/frontend/app/page.tsx[m
+[1m+++ b/frontend/app/page.tsx[m
+[36m@@ -8,7 +8,7 @@[m [mimport {[m
+   RunResult,[m
+ } from "../frontend-lib-api";[m
+ [m
+[31m-type BottomTab = "none" | "output" | "terminal" | "ai";[m
+[32m+[m[32mtype BottomTab = "none" | "output" | "terminal" | "ai" | "git";[m
+ [m
+ export default function OrdisApp() {[m
+   // Session[m
+[36m@@ -49,6 +49,11 @@[m [mexport default function OrdisApp() {[m
+   const terminalLogRef = useRef<HTMLPreElement>(null);[m
+   const textareaRef = useRef<HTMLTextAreaElement>(null);[m
+ [m
+[32m+[m[32m  // Git state[m
+[32m+[m[32m  const [gitCommitMsg, setGitCommitMsg] = useState<string>("");[m
+[32m+[m[32m  const [gitBranchName, setGitBranchName] = useState<string>("");[m
+[32m+[m[32m  const [gitLog, setGitLog] = useState<string>("[git panel ready - use buttons above to manage repository]\n");[m
+[32m+[m
+   const isDirty = fileContent !== savedContent;[m
+ [m
+   // Language auto-detect[m
+[36m@@ -266,6 +271,7 @@[m [mexport default function OrdisApp() {[m
+       sessionId,[m
+       (data) => {[m
+         setTerminalLog((prev) => prev + data);[m
+[32m+[m[32m        setGitLog((prev) => prev + data);[m
+       },[m
+       (status) => {[m
+         if (status === "connected") {[m
+[36m@@ -301,6 +307,21 @@[m [mexport default function OrdisApp() {[m
+     }[m
+   };[m
+ [m
+[32m+[m[32m  // Git operations trigger[m
+[32m+[m[32m  const runGitCmd = (cmd: string) => {[m
+[32m+[m[32m    setGitLog((prev) => prev + `\n$ ${cmd}\n`);[m
+[32m+[m[32m    if (!terminalSocketRef.current || !terminalConnected) {[m
+[32m+[m[32m      handleToggleTerminal();[m
+[32m+[m[32m      setTimeout(() => {[m
+[32m+[m[32m        if (terminalSocketRef.current) {[m
+[32m+[m[32m          terminalSocketRef.current.send(cmd + "\n");[m
+[32m+[m[32m        }[m
+[32m+[m[32m      }, 400);[m
+[32m+[m[32m    } else {[m
+[32m+[m[32m      terminalSocketRef.current.send(cmd + "\n");[m
+[32m+[m[32m    }[m
+[32m+[m[32m  };[m
+[32m+[m
+   // Helper keyboard keys for mobile[m
+   const insertKey = (char: string) => {[m
+     if (!textareaRef.current) return;[m
+[36m@@ -692,6 +713,7 @@[m [mexport default function OrdisApp() {[m
+               {activeBottomTab === "output" && "CODE EXECUTION OUTPUT"}[m
+               {activeBottomTab === "terminal" && "BASH SHELL (PTY)"}[m
+               {activeBottomTab === "ai" && "AI AGENT ASSISTANT"}[m
+[32m+[m[32m              {activeBottomTab === "git" && "GIT OPERATIONS & REPO SYNC"}[m
+             </span>[m
+ [m
+             <div style={{ display: "flex", gap: "6px" }}>[m
+[36m@@ -1015,6 +1037,183 @@[m [mexport default function OrdisApp() {[m
+               </pre>[m
+             </div>[m
+           )}[m
+[32m+[m
+[32m+[m[32m          {/* Panel Content: GIT */}[m
+[32m+[m[32m          {activeBottomTab === "git" && ([m
+[32m+[m[32m            <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "8px", overflow: "hidden" }}>[m
+[32m+[m[32m              {/* Row 1: Status & Sync Buttons */}[m
+[32m+[m[32m              <div style={{ display: "flex", gap: "4px", marginBottom: "6px", overflowX: "auto", whiteSpace: "nowrap" }}>[m
+[32m+[m[32m                <button[m
+[32m+[m[32m                  onClick={() => runGitCmd("git status")}[m
+[32m+[m[32m                  style={{ background: "#202020", color: "#fff", border: "1px solid #3a3a3a", padding: "3px 8px", fontSize: "11px", fontFamily: "monospace", cursor: "pointer" }}[m
+[32m+[m[32m                >[m
+[32m+[m[32m                  STATUS[m
+[32m+[m[32m                </button>[m
+[32m+[m[32m                <button[m
+[32m+[m[32m                  onClick={() => runGitCmd("git diff")}[m
+[32m+[m[32m                  style={{ background: "#202020", color: "#fff", border: "1px solid #3a3a3a", padding: "3px 8px", fontSize: "11px", fontFamily: "monospace", cursor: "pointer" }}[m
+[32m+[m[32m                >[m
+[32m+[m[32m                  DIFF[m
+[32m+[m[32m                </button>[m
+[32m+[m[32m                <button[m
+[32m+[m[32m                  onClick={() => runGitCmd("git log --oneline -n 5")}[m
+[32m+[m[32m                  style={{ background: "#202020", color: "#fff", border: "1px solid #3a3a3a", padding: "3px 8px", fontSize: "11px", fontFamily: "monospace", cursor: "pointer" }}[m
+[32m+[m[32m                >[m
+[32m+[m[32m                  LOG[m
+[32m+[m[32m                </button>[m
+[32m+[m[32m                <button[m
+[32m+[m[32m                  onClick={() => runGitCmd("git pull")}[m
+[32m+[m[32m                  style={{ background: "#202020", color: "#fff", border: "1px solid #3a3a3a", padding: "3px 8px", fontSize: "11px", fontFamily: "monospace", cursor: "pointer" }}[m
+[32m+[m[32m                >[m
+[32m+[m[32m                  PULL[m
+[32m+[m[32m                </button>[m
+[32m+[m[32m                <button[m
+[32m+[m[32m                  onClick={() => runGitCmd("git push")}[m
+[32m+[m[32m                  style={{ background: "#202020", color: "#fff", border: "1px solid #3a3a3a", padding: "3px 8px", fontSize: "11px", fontFamily: "monospace", cursor: "pointer" }}[m
+[32m+[m[32m                >[m
+[32m+[m[32m                  PUSH[m
+[32m+[m[32m                </button>[m
+[32m+[m[32m                <button[m
+[32m+[m[32m                  onClick={() => runGitCmd("git fetch")}[m
+[32m+[m[32m                  style={{ background: "#202020", color: "#fff", border: "1px solid #3a3a3a", padding: "3px 8px", fontSize: "11px", fontFamily: "monospace", cursor: "pointer" }}[m
+[32m+[m[32m                >[m
+[32m+[m[32m                  FETCH[m
+[32m+[m[32m                </button>[m
+[32m+[m[32m                <button[m
+[32m+[m[32m                  onClick={() => runGitCmd("git branch -a")}[m
+[32m+[m[32m                  style={{ background: "#202020", color: "#fff", border: "1px solid #3a3a3a", padding: "3px 8px", fontSize: "11px", fontFamily: "monospace", cursor: "pointer" }}[m
+[32m+[m[32m                >[m
+[32m+[m[32m                  BRANCHES[m
+[32m+[m[32m                </button>[m
+[32m+[m[32m                <button[m
+[32m+[m[32m                  onClick={() => runGitCmd("git stash")}[m
+[32m+[m[32m                  style={{ background: "#202020", color: "#fff", border: "1px solid #3a3a3a", padding: "3px 8px", fontSize: "11px", fontFamily: "monospace", cursor: "pointer" }}[m
+[32m+[m[32m                >[m
+[32m+[m[32m                  STASH[m
+[32m+[m[32m                </button>[m
+[32m+[m[32m                <button[m
+[32m+[m[32m                  onClick={() => runGitCmd("git stash pop")}[m
+[32m+[m[32m                  style={{ background: "#202020", color: "#fff", border: "1px solid #3a3a3a", padding: "3px 8px", fontSize: "11px", fontFamily: "monospace", cursor: "pointer" }}[m
+[32m+[m[32m                >[m
+[32m+[m[32m                  POP[m
+[32m+[m[32m                </button>[m
+[32m+[m[32m              </div>[m
+[32m+[m
+[32m+[m[32m              {/* Row 2: Stage & Commit */}[m
+[32m+[m[32m              <div style={{ display: "flex", gap: "4px", marginBottom: "6px" }}>[m
+[32m+[m[32m                <button[m
+[32m+[m[32m                  onClick={() => runGitCmd("git add .")}[m
+[32m+[m[32m                  style={{ background: "#222", color: "#ccc", border: "1px solid #444", padding: "3px 8px", fontSize: "11px", fontFamily: "monospace", cursor: "pointer", whiteSpace: "nowrap" }}[m
+[32m+[m[32m                >[m
+[32m+[m[32m                  STAGE ALL[m
+[32m+[m[32m                </button>[m
+[32m+[m[32m                <input[m
+[32m+[m[32m                  type="text"[m
+[32m+[m[32m                  placeholder="commit message..."[m
+[32m+[m[32m                  value={gitCommitMsg}[m
+[32m+[m[32m                  onChange={(e) => setGitCommitMsg(e.target.value)}[m
+[32m+[m[32m                  onKeyDown={(e) => {[m
+[32m+[m[32m                    if (e.key === "Enter" && gitCommitMsg.trim()) {[m
+[32m+[m[32m                      runGitCmd(`git commit -m "${gitCommitMsg.replace(/"/g, '\\"')}"`);[m
+[32m+[m[32m                      setGitCommitMsg("");[m
+[32m+[m[32m                    }[m
+[32m+[m[32m                  }}[m
+[32m+[m[32m                  style={{[m
+[32m+[m[32m                    flex: 1,[m
+[32m+[m[32m                    background: "#080808",[m
+[32m+[m[32m                    color: "#fff",[m
+[32m+[m[32m                    border: "1px solid #333",[m
+[32m+[m[32m                    padding: "3px 6px",[m
+[32m+[m[32m                    fontFamily: "monospace",[m
+[32m+[m[32m                    fontSize: "11px",[m
+[32m+[m[32m                  }}[m
+[32m+[m[32m                />[m
+[32m+[m[32m                <button[m
+[32m+[m[32m                  onClick={() => {[m
+[32m+[m[32m                    if (gitCommitMsg.trim()) {[m
+[32m+[m[32m                      runGitCmd(`git commit -m "${gitCommitMsg.replace(/"/g, '\\"')}"`);[m
+[32m+[m[32m                      setGitCommitMsg("");[m
+[32m+[m[32m                    }[m
+[32m+[m[32m                  }}[m
+[32m+[m[32m                  style={{[m
+[32m+[m[32m                    background: "#fff",[m
+[32m+[m[32m                    color: "#000",[m
+[32m+[m[32m                    border: "none",[m
+[32m+[m[32m                    padding: "3px 8px",[m
+[32m+[m[32m                    fontFamily: "monospace",[m
+[32m+[m[32m                    fontSize: "11px",[m
+[32m+[m[32m                    fontWeight: "bold",[m
+[32m+[m[32m                    cursor: "pointer",[m
+[32m+[m[32m                    whiteSpace: "nowrap",[m
+[32m+[m[32m                  }}[m
+[32m+[m[32m                >[m
+[32m+[m[32m                  COMMIT[m
+[32m+[m[32m                </button>[m
+[32m+[m[32m              </div>[m
+[32m+[m
+[32m+[m[32m              {/* Row 3: Branch creation / switch */}[m
+[32m+[m[32m              <div style={{ display: "flex", gap: "4px", marginBottom: "6px" }}>[m
+[32m+[m[32m                <input[m
+[32m+[m[32m                  type="text"[m
+[32m+[m[32m                  placeholder="new branch name..."[m
+[32m+[m[32m                  value={gitBranchName}[m
+[32m+[m[32m                  onChange={(e) => setGitBranchName(e.target.value)}[m
+[32m+[m[32m                  onKeyDown={(e) => {[m
+[32m+[m[32m                    if (e.key === "Enter" && gitBranchName.trim()) {[m
+[32m+[m[32m                      runGitCmd(`git checkout -b ${gitBranchName.trim()}`);[m
+[32m+[m[32m                      setGitBranchName("");[m
+[32m+[m[32m                    }[m
+[32m+[m[32m                  }}[m
+[32m+[m[32m                  style={{[m
+[32m+[m[32m                    flex: 1,[m
+[32m+[m[32m                    background: "#080808",[m
+[32m+[m[32m                    color: "#fff",[m
+[32m+[m[32m                    border: "1px solid #333",[m
+[32m+[m[32m                    padding: "3px 6px",[m
+[32m+[m[32m                    fontFamily: "monospace",[m
+[32m+[m[32m                    fontSize: "11px",[m
+[32m+[m[32m                  }}[m
+[32m+[m[32m                />[m
+[32m+[m[32m                <button[m
+[32m+[m[32m                  onClick={() => {[m
+[32m+[m[32m                    if (gitBranchName.trim()) {[m
+[32m+[m[32m                      runGitCmd(`git checkout -b ${gitBranchName.trim()}`);[m
+[32m+[m[32m                      setGitBranchName("");[m
+[32m+[m[32m                    }[m
+[32m+[m[32m                  }}[m
+[32m+[m[32m                  style={{[m
+[32m+[m[32m                    background: "#222",[m
+[32m+[m[32m                    color: "#fff",[m
+[32m+[m[32m                    border: "1px solid #444",[m
+[32m+[m[32m                    padding: "3px 8px",[m
+[32m+[m[32m                    fontFamily: "monospace",[m
+[32m+[m[32m                    fontSize: "11px",[m
+[32m+[m[32m                    cursor: "pointer",[m
+[32m+[m[32m                    whiteSpace: "nowrap",[m
+[32m+[m[32m                  }}[m
+[32m+[m[32m                >[m
+[32m+[m[32m                  + BRANCH[m
+[32m+[m[32m                </button>[m
+[32m+[m[32m              </div>[m
+[32m+[m
+[32m+[m[32m              {/* Git Output Preview */}[m
+[32m+[m[32m              <pre style={{[m
+[32m+[m[32m                flex: 1,[m
+[32m+[m[32m                margin: 0,[m
+[32m+[m[32m                background: "#050505",[m
+[32m+[m[32m                color: "#e0e0e0",[m
+[32m+[m[32m                border: "1px solid #222",[m
+[32m+[m[32m                padding: "8px",[m
+[32m+[m[32m                fontSize: "11px",[m
+[32m+[m[32m                lineHeight: "16px",[m
+[32m+[m[32m                overflowY: "auto",[m
+[32m+[m[32m                whiteSpace: "pre-wrap",[m
+[32m+[m[32m                wordBreak: "break-all",[m
+[32m+[m[32m              }}>[m
+[32m+[m[32m                {gitLog}[m
+[32m+[m[32m              </pre>[m
+[32m+[m[32m            </div>[m
+[32m+[m[32m          )}[m
+         </div>[m
+       )}[m
+ [m
+[36m@@ -1080,6 +1279,27 @@[m [mexport default function OrdisApp() {[m
+           >[m
+             [AI AGENT][m
+           </button>[m
+[32m+[m[32m          <button[m
+[32m+[m[32m            onClick={() => {[m
+[32m+[m[32m              if (activeBottomTab === "git") {[m
+[32m+[m[32m                setActiveBottomTab("none");[m
+[32m+[m[32m              } else {[m
+[32m+[m[32m                setActiveBottomTab("git");[m
+[32m+[m[32m                if (!terminalConnected) handleToggleTerminal();[m
+[32m+[m[32m              }[m
+[32m+[m[32m            }}[m
+[32m+[m[32m            style={{[m
+[32m+[m[32m              background: activeBottomTab === "git" ? "#333" : "transparent",[m
+[32m+[m[32m              color: activeBottomTab === "git" ? "#fff" : "#888",[m
+[32m+[m[32m              border: activeBottomTab === "git" ? "1px solid #555" : "1px solid transparent",[m
+[32m+[m[32m              padding: "4px 8px",[m
+[32m+[m[32m              fontFamily: "monospace",[m
+[32m+[m[32m              fontSize: "11px",[m
+[32m+[m[32m              cursor: "pointer",[m
+[32m+[m[32m            }}[m
+[32m+[m[32m          >[m
+[32m+[m[32m            [GIT][m
+[32m+[m[32m          </button>[m
+         </div>[m
+ [m
+         {/* Status indicator */}[m
+[1mdiff --git a/index.html b/index.html[m
+[1mindex 431d9ea..f3fc69a 100644[m
+[1m--- a/index.html[m
+[1m+++ b/index.html[m
+[36m@@ -99,7 +99,7 @@[m
+       background: #0d0d0d;[m
+       border-right: 1px solid #1f1f1f;[m
+       color: #444444;[m
+[31m-      font-size: 13px;[m
+[32m+[m[32m      fontSize: 13px;[m
+       line-height: 20px;[m
+       text-align: right;[m
+       padding: 8px 6px 8px 0;[m
+[36m@@ -278,6 +278,32 @@[m [mprint("hello world")[m
+       <div id="voiceStatus" style="font-size:10px; color:#888; margin-bottom:4px;"></div>[m
+       <pre id="agentReply" class="output-box" style="flex:1;">(Agent responses and file edit summaries will appear here)</pre>[m
+     </div>[m
+[32m+[m
+[32m+[m[32m    <!-- Git Tab -->[m
+[32m+[m[32m    <div id="panelGit" style="flex:1; display:none; flex-direction:column; padding:8px; overflow:hidden;">[m
+[32m+[m[32m      <div style="display:flex; gap:4px; margin-bottom:6px; overflow-x:auto; white-space:nowrap;">[m
+[32m+[m[32m        <button class="btn" onclick="runGitCmd('git status')">STATUS</button>[m
+[32m+[m[32m        <button class="btn" onclick="runGitCmd('git diff')">DIFF</button>[m
+[32m+[m[32m        <button class="btn" onclick="runGitCmd('git log --oneline -n 5')">LOG</button>[m
+[32m+[m[32m        <button class="btn" onclick="runGitCmd('git pull')">PULL</button>[m
+[32m+[m[32m        <button class="btn" onclick="runGitCmd('git push')">PUSH</button>[m
+[32m+[m[32m        <button class="btn" onclick="runGitCmd('git fetch')">FETCH</button>[m
+[32m+[m[32m        <button class="btn" onclick="runGitCmd('git branch -a')">BRANCHES</button>[m
+[32m+[m[32m        <button class="btn" onclick="runGitCmd('git stash')">STASH</button>[m
+[32m+[m[32m        <button class="btn" onclick="runGitCmd('git stash pop')">POP</button>[m
+[32m+[m[32m      </div>[m
+[32m+[m[32m      <div style="display:flex; gap:4px; margin-bottom:6px;">[m
+[32m+[m[32m        <button class="btn" style="white-space:nowrap;" onclick="runGitCmd('git add .')">STAGE ALL</button>[m
+[32m+[m[32m        <input id="gitCommitInput" placeholder="commit message..." style="flex:1; background:#080808; color:#fff; border:1px solid #333; padding:3px 6px; font-size:11px;" onkeydown="if(event.key==='Enter') commitGit()" />[m
+[32m+[m[32m        <button class="btn btn-white" onclick="commitGit()">COMMIT</button>[m
+[32m+[m[32m      </div>[m
+[32m+[m[32m      <div style="display:flex; gap:4px; margin-bottom:6px;">[m
+[32m+[m[32m        <input id="gitBranchInput" placeholder="new branch name..." style="flex:1; background:#080808; color:#fff; border:1px solid #333; padding:3px 6px; font-size:11px;" onkeydown="if(event.key==='Enter') branchGit()" />[m
+[32m+[m[32m        <button class="btn" onclick="branchGit()">+ BRANCH</button>[m
+[32m+[m[32m      </div>[m
+[32m+[m[32m      <pre id="gitLog" class="output-box" style="flex:1;">[git panel ready - use buttons above to manage repository][m
+[32m+[m[32m</pre>[m
+[32m+[m[32m    </div>[m
+   </div>[m
+ [m
+   <!-- Bottom Dock Bar -->[m
+[36m@@ -286,6 +312,7 @@[m [mprint("hello world")[m
+       <button id="tabBtnOutput" class="dock-tab-btn" onclick="toggleBottomTab('output')">[OUTPUT]</button>[m
+       <button id="tabBtnTerminal" class="dock-tab-btn" onclick="toggleBottomTab('terminal')">[TERMINAL]</button>[m
+       <button id="tabBtnAI" class="dock-tab-btn" onclick="toggleBottomTab('ai')">[AI AGENT]</button>[m
+[32m+[m[32m      <button id="tabBtnGit" class="dock-tab-btn" onclick="toggleBottomTab('git')">[GIT]</button>[m
+     </div>[m
+     <div id="footerStatus" style="font-size:10px; color:#666;">READY</div>[m
+   </footer>[m
+[36m@@ -338,12 +365,14 @@[m [mprint("hello world")[m
+       const pOut = document.getElementById("panelOutput");[m
+       const pTerm = document.getElementById("panelTerminal");[m
+       const pAI = document.getElementById("panelAI");[m
+[32m+[m[32m      const pGit = document.getElementById("panelGit");[m
+       const tOut = document.getElementById("tabBtnOutput");[m
+       const tTerm = document.getElementById("tabBtnTerminal");[m
+       const tAI = document.getElementById("tabBtnAI");[m
+[32m+[m[32m      const tGit = document.getElementById("tabBtnGit");[m
+ [m
+[31m-      [tOut, tTerm, tAI].forEach(b => b.classList.remove("active"));[m
+[31m-      [pOut, pTerm, pAI].forEach(p => p.style.display = "none");[m
+[32m+[m[32m      [tOut, tTerm, tAI, tGit].forEach(b => b.classList.remove("active"));[m
+[32m+[m[32m      [pOut, pTerm, pAI, pGit].forEach(p => p.style.display = "none");[m
+ [m
+       if (tab === "none") {[m
+         dock.style.display = "none";[m
+[36m@@ -366,6 +395,13 @@[m [mprint("hello world")[m
+         pAI.style.display = "flex";[m
+         tAI.classList.add("active");[m
+         document.getElementById("dockTitle").innerText = "AI AGENT ASSISTANT";[m
+[32m+[m[32m      } else if (tab === "git") {[m
+[32m+[m[32m        pGit.style.display = "flex";[m
+[32m+[m[32m        tGit.classList.add("active");[m
+[32m+[m[32m        document.getElementById("dockTitle").innerText = "GIT OPERATIONS & REPO SYNC";[m
+[32m+[m[32m        if (!terminalSocket || terminalSocket.readyState !== WebSocket.OPEN) {[m
+[32m+[m[32m          toggleTerminal();[m
+[32m+[m[32m        }[m
+       }[m
+     }[m
+ [m
+[36m@@ -594,8 +630,15 @@[m [mprint("hello world")[m
+       };[m
+ [m
+       terminalSocket.onmessage = (e) => {[m
+[31m-        log.innerText += cleanAnsi(e.data);[m
+[32m+[m[32m        const text = cleanAnsi(e.data);[m
+[32m+[m[32m        log.innerText += text;[m
+         log.scrollTop = log.scrollHeight;[m
+[32m+[m
+[32m+[m[32m        const gitLog = document.getElementById("gitLog");[m
+[32m+[m[32m        if (gitLog) {[m
+[32m+[m[32m          gitLog.innerText += text;[m
+[32m+[m[32m          gitLog.scrollTop = gitLog.scrollHeight;[m
+[32m+[m[32m        }[m
+       };[m
+ [m
+       terminalSocket.onclose = () => {[m
+[36m@@ -617,6 +660,9 @@[m [mprint("hello world")[m
+     function sendQuickCommand(cmd) {[m
+       if (!terminalSocket || terminalSocket.readyState !== WebSocket.OPEN) {[m
+         toggleTerminal();[m
+[32m+[m[32m        setTimeout(() => {[m
+[32m+[m[32m          if (terminalSocket) terminalSocket.send(cmd + "\n");[m
+[32m+[m[32m        }, 300);[m
+         return;[m
+       }[m
+       terminalSocket.send(cmd + "\n");[m
+[36m@@ -628,6 +674,29 @@[m [mprint("hello world")[m
+       }[m
+     }[m
+ [m
+[32m+[m[32m    // Git operations handler[m
+[32m+[m[32m    function runGitCmd(cmd) {[m
+[32m+[m[32m      const gLog = document.getElementById("gitLog");[m
+[32m+[m[32m      gLog.innerText += `\n$ ${cmd}\n`;[m
+[32m+[m[32m      sendQuickCommand(cmd);[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    function commitGit() {[m
+[32m+[m[32m      const inp = document.getElementById("gitCommitInput");[m
+[32m+[m[32m      const msg = inp.value.trim();[m
+[32m+[m[32m      if (!msg) return;[m
+[32m+[m[32m      runGitCmd(`git commit -m "${msg.replace(/"/g, '\\"')}"`);[m
+[32m+[m[32m      inp.value = "";[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    function branchGit() {[m
+[32m+[m[32m      const inp = document.getElementById("gitBranchInput");[m
+[32m+[m[32m      const name = inp.value.trim();[m
+[32m+[m[32m      if (!name) return;[m
+[32m+[m[32m      runGitCmd(`git checkout -b ${name}`);[m
+[32m+[m[32m      inp.value = "";[m
+[32m+[m[32m    }[m
+[32m+[m
+     // Keyboard keys helper[m
+     function insertKey(k) {[m
+       const editor = document.getElementById("codeEditor");[m

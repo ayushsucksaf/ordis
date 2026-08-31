@@ -8,7 +8,7 @@ import {
   RunResult,
 } from "../frontend-lib-api";
 
-type BottomTab = "none" | "output" | "terminal" | "ai";
+type BottomTab = "none" | "output" | "terminal" | "ai" | "git";
 
 export default function OrdisApp() {
   // Session
@@ -48,6 +48,11 @@ export default function OrdisApp() {
   const terminalSocketRef = useRef<TerminalSession | null>(null);
   const terminalLogRef = useRef<HTMLPreElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Git state
+  const [gitCommitMsg, setGitCommitMsg] = useState<string>("");
+  const [gitBranchName, setGitBranchName] = useState<string>("");
+  const [gitLog, setGitLog] = useState<string>("[git panel ready - use buttons above to manage repository]\n");
 
   const isDirty = fileContent !== savedContent;
 
@@ -266,6 +271,7 @@ export default function OrdisApp() {
       sessionId,
       (data) => {
         setTerminalLog((prev) => prev + data);
+        setGitLog((prev) => prev + data);
       },
       (status) => {
         if (status === "connected") {
@@ -298,6 +304,21 @@ export default function OrdisApp() {
   const handleSendCtrlC = () => {
     if (terminalSocketRef.current && terminalConnected) {
       terminalSocketRef.current.send("\x03");
+    }
+  };
+
+  // Git operations trigger
+  const runGitCmd = (cmd: string) => {
+    setGitLog((prev) => prev + `\n$ ${cmd}\n`);
+    if (!terminalSocketRef.current || !terminalConnected) {
+      handleToggleTerminal();
+      setTimeout(() => {
+        if (terminalSocketRef.current) {
+          terminalSocketRef.current.send(cmd + "\n");
+        }
+      }, 400);
+    } else {
+      terminalSocketRef.current.send(cmd + "\n");
     }
   };
 
@@ -692,6 +713,7 @@ export default function OrdisApp() {
               {activeBottomTab === "output" && "CODE EXECUTION OUTPUT"}
               {activeBottomTab === "terminal" && "BASH SHELL (PTY)"}
               {activeBottomTab === "ai" && "AI AGENT ASSISTANT"}
+              {activeBottomTab === "git" && "GIT OPERATIONS & REPO SYNC"}
             </span>
 
             <div style={{ display: "flex", gap: "6px" }}>
@@ -1015,6 +1037,248 @@ export default function OrdisApp() {
               </pre>
             </div>
           )}
+
+          {/* Panel Content: GIT */}
+          {activeBottomTab === "git" && (
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "8px", overflow: "hidden" }}>
+              {/* Row 1: Status & Sync Buttons */}
+              <div style={{ display: "flex", gap: "4px", marginBottom: "6px", overflowX: "auto", whiteSpace: "nowrap" }}>
+                <button
+                  onClick={() => runGitCmd("git status")}
+                  style={{ background: "#202020", color: "#fff", border: "1px solid #3a3a3a", padding: "3px 8px", fontSize: "11px", fontFamily: "monospace", cursor: "pointer" }}
+                >
+                  STATUS
+                </button>
+                <button
+                  onClick={() => runGitCmd("git diff")}
+                  style={{ background: "#202020", color: "#fff", border: "1px solid #3a3a3a", padding: "3px 8px", fontSize: "11px", fontFamily: "monospace", cursor: "pointer" }}
+                >
+                  DIFF
+                </button>
+                <button
+                  onClick={() => runGitCmd("git log --oneline -n 5")}
+                  style={{ background: "#202020", color: "#fff", border: "1px solid #3a3a3a", padding: "3px 8px", fontSize: "11px", fontFamily: "monospace", cursor: "pointer" }}
+                >
+                  LOG
+                </button>
+                <button
+                  onClick={() => runGitCmd("git pull")}
+                  style={{ background: "#202020", color: "#fff", border: "1px solid #3a3a3a", padding: "3px 8px", fontSize: "11px", fontFamily: "monospace", cursor: "pointer" }}
+                >
+                  PULL
+                </button>
+                <button
+                  onClick={() => runGitCmd("git push")}
+                  style={{ background: "#202020", color: "#fff", border: "1px solid #3a3a3a", padding: "3px 8px", fontSize: "11px", fontFamily: "monospace", cursor: "pointer" }}
+                >
+                  PUSH
+                </button>
+                <button
+                  onClick={() => runGitCmd("git fetch")}
+                  style={{ background: "#202020", color: "#fff", border: "1px solid #3a3a3a", padding: "3px 8px", fontSize: "11px", fontFamily: "monospace", cursor: "pointer" }}
+                >
+                  FETCH
+                </button>
+                <button
+                  onClick={() => runGitCmd("git branch -a")}
+                  style={{ background: "#202020", color: "#fff", border: "1px solid #3a3a3a", padding: "3px 8px", fontSize: "11px", fontFamily: "monospace", cursor: "pointer" }}
+                >
+                  BRANCHES
+                </button>
+                <button
+                  onClick={() => runGitCmd("git stash")}
+                  style={{ background: "#202020", color: "#fff", border: "1px solid #3a3a3a", padding: "3px 8px", fontSize: "11px", fontFamily: "monospace", cursor: "pointer" }}
+                >
+                  STASH
+                </button>
+                <button
+                  onClick={() => runGitCmd("git stash pop")}
+                  style={{ background: "#202020", color: "#fff", border: "1px solid #3a3a3a", padding: "3px 8px", fontSize: "11px", fontFamily: "monospace", cursor: "pointer" }}
+                >
+                  POP
+                </button>
+              </div>
+
+              {/* Row 2: Stage & Commit */}
+              <div style={{ display: "flex", gap: "4px", marginBottom: "6px" }}>
+                <button
+                  onClick={() => runGitCmd("git add .")}
+                  style={{ background: "#222", color: "#ccc", border: "1px solid #444", padding: "3px 8px", fontSize: "11px", fontFamily: "monospace", cursor: "pointer", whiteSpace: "nowrap" }}
+                >
+                  STAGE ALL
+                </button>
+                <input
+                  type="text"
+                  placeholder="commit message..."
+                  value={gitCommitMsg}
+                  onChange={(e) => setGitCommitMsg(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && gitCommitMsg.trim()) {
+                      runGitCmd(`git commit -m "${gitCommitMsg.replace(/"/g, '\\"')}"`);
+                      setGitCommitMsg("");
+                    }
+                  }}
+                  style={{
+                    flex: 1,
+                    background: "#080808",
+                    color: "#fff",
+                    border: "1px solid #333",
+                    padding: "3px 6px",
+                    fontFamily: "monospace",
+                    fontSize: "11px",
+                  }}
+                />
+                <button
+                  onClick={() => {
+                    if (gitCommitMsg.trim()) {
+                      runGitCmd(`git commit -m "${gitCommitMsg.replace(/"/g, '\\"')}"`);
+                      setGitCommitMsg("");
+                    }
+                  }}
+                  style={{
+                    background: "#fff",
+                    color: "#000",
+                    border: "none",
+                    padding: "3px 8px",
+                    fontFamily: "monospace",
+                    fontSize: "11px",
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  COMMIT
+                </button>
+              </div>
+
+              {/* Row 3: Branch creation / switch */}
+              <div style={{ display: "flex", gap: "4px", marginBottom: "6px" }}>
+                <input
+                  type="text"
+                  placeholder="new branch name..."
+                  value={gitBranchName}
+                  onChange={(e) => setGitBranchName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && gitBranchName.trim()) {
+                      runGitCmd(`git checkout -b ${gitBranchName.trim()}`);
+                      setGitBranchName("");
+                    }
+                  }}
+                  style={{
+                    flex: 1,
+                    background: "#080808",
+                    color: "#fff",
+                    border: "1px solid #333",
+                    padding: "3px 6px",
+                    fontFamily: "monospace",
+                    fontSize: "11px",
+                  }}
+                />
+                <button
+                  onClick={() => {
+                    if (gitBranchName.trim()) {
+                      runGitCmd(`git checkout -b ${gitBranchName.trim()}`);
+                      setGitBranchName("");
+                    }
+                  }}
+                  style={{
+                    background: "#222",
+                    color: "#fff",
+                    border: "1px solid #444",
+                    padding: "3px 8px",
+                    fontFamily: "monospace",
+                    fontSize: "11px",
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  + BRANCH
+                </button>
+              </div>
+
+              {/* Git Output Preview */}
+              <pre style={{
+                flex: 1,
+                margin: "0 0 6px 0",
+                background: "#050505",
+                color: "#e0e0e0",
+                border: "1px solid #222",
+                padding: "8px",
+                fontSize: "11px",
+                lineHeight: "16px",
+                overflowY: "auto",
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-all",
+              }}>
+                {gitLog}
+              </pre>
+
+              {/* Quick Helper Actions for Git Terminal (Enter, q, Ctrl+C, Clear) */}
+              <div style={{ display: "flex", gap: "4px", marginBottom: "4px" }}>
+                <button
+                  onClick={() => runGitCmd("")}
+                  style={{ background: "#222", color: "#fff", border: "1px solid #444", padding: "2px 8px", fontSize: "11px", fontFamily: "monospace", cursor: "pointer", fontWeight: "bold" }}
+                >
+                  [ENTER]
+                </button>
+                <button
+                  onClick={() => runGitCmd("q")}
+                  style={{ background: "#222", color: "#fff", border: "1px solid #444", padding: "2px 8px", fontSize: "11px", fontFamily: "monospace", cursor: "pointer" }}
+                >
+                  [q (QUIT PAGER)]
+                </button>
+                <button
+                  onClick={handleSendCtrlC}
+                  style={{ background: "#2a1515", color: "#ff8888", border: "1px solid #4a2020", padding: "2px 8px", fontSize: "11px", fontFamily: "monospace", cursor: "pointer", fontWeight: "bold" }}
+                >
+                  Ctrl+C
+                </button>
+                <button
+                  onClick={() => setGitLog("[git log cleared]\n")}
+                  style={{ background: "#1a1a1a", color: "#888", border: "1px solid #333", padding: "2px 8px", fontSize: "11px", fontFamily: "monospace", cursor: "pointer", marginLeft: "auto" }}
+                >
+                  CLEAR
+                </button>
+              </div>
+
+              {/* Interactive Git Command / Response Input */}
+              <div style={{ display: "flex", gap: "4px" }}>
+                <input
+                  type="text"
+                  placeholder="type git command, branch, or response (e.g. y, n, q)..."
+                  value={terminalCommand}
+                  onChange={(e) => setTerminalCommand(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleSendTerminal();
+                  }}
+                  style={{
+                    flex: 1,
+                    background: "#080808",
+                    color: "#fff",
+                    border: "1px solid #333",
+                    padding: "4px 8px",
+                    fontFamily: "monospace",
+                    fontSize: "11px",
+                  }}
+                />
+                <button
+                  onClick={() => handleSendTerminal()}
+                  style={{
+                    background: "#fff",
+                    color: "#000",
+                    border: "none",
+                    padding: "4px 10px",
+                    fontFamily: "monospace",
+                    fontSize: "11px",
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                  }}
+                >
+                  SEND
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1079,6 +1343,27 @@ export default function OrdisApp() {
             }}
           >
             [AI AGENT]
+          </button>
+          <button
+            onClick={() => {
+              if (activeBottomTab === "git") {
+                setActiveBottomTab("none");
+              } else {
+                setActiveBottomTab("git");
+                if (!terminalConnected) handleToggleTerminal();
+              }
+            }}
+            style={{
+              background: activeBottomTab === "git" ? "#333" : "transparent",
+              color: activeBottomTab === "git" ? "#fff" : "#888",
+              border: activeBottomTab === "git" ? "1px solid #555" : "1px solid transparent",
+              padding: "4px 8px",
+              fontFamily: "monospace",
+              fontSize: "11px",
+              cursor: "pointer",
+            }}
+          >
+            [GIT]
           </button>
         </div>
 

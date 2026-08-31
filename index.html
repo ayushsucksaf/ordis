@@ -99,7 +99,7 @@
       background: #0d0d0d;
       border-right: 1px solid #1f1f1f;
       color: #444444;
-      font-size: 13px;
+      fontSize: 13px;
       line-height: 20px;
       text-align: right;
       padding: 8px 6px 8px 0;
@@ -278,6 +278,44 @@ print("hello world")
       <div id="voiceStatus" style="font-size:10px; color:#888; margin-bottom:4px;"></div>
       <pre id="agentReply" class="output-box" style="flex:1;">(Agent responses and file edit summaries will appear here)</pre>
     </div>
+
+    <!-- Git Tab -->
+    <div id="panelGit" style="flex:1; display:none; flex-direction:column; padding:8px; overflow:hidden;">
+      <div style="display:flex; gap:4px; margin-bottom:6px; overflow-x:auto; white-space:nowrap;">
+        <button class="btn" onclick="runGitCmd('git status')">STATUS</button>
+        <button class="btn" onclick="runGitCmd('git diff')">DIFF</button>
+        <button class="btn" onclick="runGitCmd('git log --oneline -n 5')">LOG</button>
+        <button class="btn" onclick="runGitCmd('git pull')">PULL</button>
+        <button class="btn" onclick="runGitCmd('git push')">PUSH</button>
+        <button class="btn" onclick="runGitCmd('git fetch')">FETCH</button>
+        <button class="btn" onclick="runGitCmd('git branch -a')">BRANCHES</button>
+        <button class="btn" onclick="runGitCmd('git stash')">STASH</button>
+        <button class="btn" onclick="runGitCmd('git stash pop')">POP</button>
+      </div>
+      <div style="display:flex; gap:4px; margin-bottom:6px;">
+        <button class="btn" style="white-space:nowrap;" onclick="runGitCmd('git add .')">STAGE ALL</button>
+        <input id="gitCommitInput" placeholder="commit message..." style="flex:1; background:#080808; color:#fff; border:1px solid #333; padding:3px 6px; font-size:11px;" onkeydown="if(event.key==='Enter') commitGit()" />
+        <button class="btn btn-white" onclick="commitGit()">COMMIT</button>
+      </div>
+      <div style="display:flex; gap:4px; margin-bottom:6px;">
+        <input id="gitBranchInput" placeholder="new branch name..." style="flex:1; background:#080808; color:#fff; border:1px solid #333; padding:3px 6px; font-size:11px;" onkeydown="if(event.key==='Enter') branchGit()" />
+        <button class="btn" onclick="branchGit()">+ BRANCH</button>
+      </div>
+      <pre id="gitLog" class="output-box" style="flex:1; margin-bottom:6px;">[git panel ready - use buttons above to manage repository]
+</pre>
+      <!-- Quick helper actions for git terminal -->
+      <div style="display:flex; gap:4px; margin-bottom:4px;">
+        <button class="btn" style="font-weight:bold;" onclick="runGitCmd('')">[ENTER]</button>
+        <button class="btn" onclick="runGitCmd('q')">[q (QUIT PAGER)]</button>
+        <button class="btn btn-danger" onclick="sendCtrlC()">Ctrl+C</button>
+        <button class="btn" style="margin-left:auto; color:#888;" onclick="clearGitLog()">CLEAR</button>
+      </div>
+      <!-- Interactive Git Command / Response Input -->
+      <div style="display:flex; gap:4px;">
+        <input id="gitTerminalInput" placeholder="type git command, branch, or response (e.g. y, n, q)..." style="flex:1; background:#080808; color:#fff; border:1px solid #333; padding:4px 8px; font-size:11px;" onkeydown="if(event.key==='Enter') sendGitTerminalInput()" />
+        <button class="btn btn-white" onclick="sendGitTerminalInput()">SEND</button>
+      </div>
+    </div>
   </div>
 
   <!-- Bottom Dock Bar -->
@@ -286,6 +324,7 @@ print("hello world")
       <button id="tabBtnOutput" class="dock-tab-btn" onclick="toggleBottomTab('output')">[OUTPUT]</button>
       <button id="tabBtnTerminal" class="dock-tab-btn" onclick="toggleBottomTab('terminal')">[TERMINAL]</button>
       <button id="tabBtnAI" class="dock-tab-btn" onclick="toggleBottomTab('ai')">[AI AGENT]</button>
+      <button id="tabBtnGit" class="dock-tab-btn" onclick="toggleBottomTab('git')">[GIT]</button>
     </div>
     <div id="footerStatus" style="font-size:10px; color:#666;">READY</div>
   </footer>
@@ -338,12 +377,14 @@ print("hello world")
       const pOut = document.getElementById("panelOutput");
       const pTerm = document.getElementById("panelTerminal");
       const pAI = document.getElementById("panelAI");
+      const pGit = document.getElementById("panelGit");
       const tOut = document.getElementById("tabBtnOutput");
       const tTerm = document.getElementById("tabBtnTerminal");
       const tAI = document.getElementById("tabBtnAI");
+      const tGit = document.getElementById("tabBtnGit");
 
-      [tOut, tTerm, tAI].forEach(b => b.classList.remove("active"));
-      [pOut, pTerm, pAI].forEach(p => p.style.display = "none");
+      [tOut, tTerm, tAI, tGit].forEach(b => b.classList.remove("active"));
+      [pOut, pTerm, pAI, pGit].forEach(p => p.style.display = "none");
 
       if (tab === "none") {
         dock.style.display = "none";
@@ -366,6 +407,13 @@ print("hello world")
         pAI.style.display = "flex";
         tAI.classList.add("active");
         document.getElementById("dockTitle").innerText = "AI AGENT ASSISTANT";
+      } else if (tab === "git") {
+        pGit.style.display = "flex";
+        tGit.classList.add("active");
+        document.getElementById("dockTitle").innerText = "GIT OPERATIONS & REPO SYNC";
+        if (!terminalSocket || terminalSocket.readyState !== WebSocket.OPEN) {
+          toggleTerminal();
+        }
       }
     }
 
@@ -594,8 +642,15 @@ print("hello world")
       };
 
       terminalSocket.onmessage = (e) => {
-        log.innerText += cleanAnsi(e.data);
+        const text = cleanAnsi(e.data);
+        log.innerText += text;
         log.scrollTop = log.scrollHeight;
+
+        const gitLog = document.getElementById("gitLog");
+        if (gitLog) {
+          gitLog.innerText += text;
+          gitLog.scrollTop = gitLog.scrollHeight;
+        }
       };
 
       terminalSocket.onclose = () => {
@@ -617,6 +672,9 @@ print("hello world")
     function sendQuickCommand(cmd) {
       if (!terminalSocket || terminalSocket.readyState !== WebSocket.OPEN) {
         toggleTerminal();
+        setTimeout(() => {
+          if (terminalSocket) terminalSocket.send(cmd + "\n");
+        }, 300);
         return;
       }
       terminalSocket.send(cmd + "\n");
@@ -626,6 +684,43 @@ print("hello world")
       if (terminalSocket && terminalSocket.readyState === WebSocket.OPEN) {
         terminalSocket.send("\x03");
       }
+    }
+
+    // Git operations handler
+    function runGitCmd(cmd) {
+      const gLog = document.getElementById("gitLog");
+      gLog.innerText += `\n$ ${cmd}\n`;
+      sendQuickCommand(cmd);
+    }
+
+    function commitGit() {
+      const inp = document.getElementById("gitCommitInput");
+      const msg = inp.value.trim();
+      if (!msg) return;
+      runGitCmd(`git commit -m "${msg.replace(/"/g, '\\"')}"`);
+      inp.value = "";
+    }
+
+    function branchGit() {
+      const inp = document.getElementById("gitBranchInput");
+      const name = inp.value.trim();
+      if (!name) return;
+      runGitCmd(`git checkout -b ${name}`);
+      inp.value = "";
+    }
+
+    function sendGitTerminalInput() {
+      const inp = document.getElementById("gitTerminalInput");
+      const cmd = inp.value;
+      const gLog = document.getElementById("gitLog");
+      gLog.innerText += `\n> ${cmd}\n`;
+      sendQuickCommand(cmd);
+      inp.value = "";
+    }
+
+    function clearGitLog() {
+      const gLog = document.getElementById("gitLog");
+      if (gLog) gLog.innerText = "[git log cleared]\n";
     }
 
     // Keyboard keys helper

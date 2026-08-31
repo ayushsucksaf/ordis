@@ -12,6 +12,8 @@ async def pty_terminal(websocket: WebSocket, session_dir: str):
         env = os.environ.copy()
         env["TERM"] = "xterm-256color"
         env["PS1"] = "$ "
+        env["PAGER"] = "cat"
+        env["GIT_PAGER"] = "cat"
         os.execvpe("bash", ["bash", "--norc"], env)
         return
 
