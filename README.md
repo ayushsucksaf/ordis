@@ -62,6 +62,6 @@ go to
 ```
 http://127.0.0.1:8000
 ```
-on chromium based browser (not tested on firefox)
+on any browser (untested on firefox based browsers).
 
-currently index.html is the test frontend, will update if frontend is ready.
+The demo mobile IDE (editor, runner, live terminal, AI agent, and git manager) will load directly with zero extra setup.
