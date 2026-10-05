@@ -2,7 +2,7 @@
 
 phone first coding ide. open it on ur android phone, edit any file in ur repo, hit run and it actually compiles/runs python, cpp or js right there. theres also an locally hosted ai agent (gemini here for demo purposed) that can edit ur code for u if u just ask, a real terminal thats connected to ur actual project folder, and speech to text so u can talk to the agent instead of typing everything out. all of this runs fully on device thru termux, no cloud backend, no external server.
 
-built for the iqoo hackathon, this is the phase 1 idea.
+**Note that for the real build llama.cpp will be used to host models locally on android in termux**
 
 ## running it on android
 
